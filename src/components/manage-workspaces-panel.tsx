@@ -2,13 +2,15 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2 } from "lucide-react";
+import { Crown, Pencil, Trash2 } from "lucide-react";
 import {
   deleteTeamWorkspaceAction,
   updateTeamWorkspaceNameAction,
 } from "@/actions/teams";
 import { AddTeamDialog } from "@/components/add-team-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +51,19 @@ function formatEventTime(d: Date | string) {
 
 function planLabel(slug: string) {
   return displayNameForBillingPlanSlug(slug);
+}
+
+function historyAction(action: string): { label: string; className: string } {
+  if (action === "created") {
+    return { label: "Created", className: "manage-workspaces-created" };
+  }
+  if (action === "deleted") {
+    return { label: "Deleted", className: "manage-workspaces-deleted" };
+  }
+  if (action === "updated") {
+    return { label: "Renamed", className: "manage-workspaces-renamed" };
+  }
+  return { label: action, className: "manage-workspaces-renamed" };
 }
 
 export type ManageWorkspacesTeamRow = {
@@ -150,14 +165,14 @@ export function ManageWorkspacesPanel({
   }
 
   return (
-    <div className="flex flex-col gap-10">
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-6">
+      <Card className="manage-workspaces-card shadow-none ring-0">
+        <div className="manage-workspaces-section-header">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Your workspaces</h2>
-            <p className="text-sm text-muted-foreground">
-              Rename or remove subscriber-owned team workspaces. Members lose access when a workspace
-              is deleted.
+            <h2>Your workspaces</h2>
+            <p>
+              Rename or remove subscriber-owned team workspaces. Members lose access when a
+              workspace is deleted.
             </p>
           </div>
           <AddTeamDialog
@@ -168,31 +183,34 @@ export function ManageWorkspacesPanel({
         </div>
 
         {teams.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-            No workspaces yet. Create one above.
-          </p>
+          <p className="manage-workspaces-empty">No workspaces yet. Create one above.</p>
         ) : (
-          <div className="rounded-lg border border-border overflow-x-auto">
+          <div className="manage-workspaces-table">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Plan</TableHead>
-                  <TableHead className="text-right w-[8rem]">Actions</TableHead>
+                  <TableHead className="w-[8rem] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {teams.map((t) => (
                   <TableRow key={t.id}>
                     <TableCell className="font-medium">{t.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{planLabel(t.planSlug)}</TableCell>
+                    <TableCell>
+                      <Badge className="manage-workspaces-plan">
+                        <Crown aria-hidden />
+                        {planLabel(t.planSlug)}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
+                      <div className="flex justify-end gap-2">
                         <Button
                           type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
+                          variant="default"
+                          size="icon"
+                          className="manage-workspaces-edit"
                           onClick={() => openEdit(t)}
                           aria-label={`Rename workspace ${t.name}`}
                         >
@@ -200,9 +218,9 @@ export function ManageWorkspacesPanel({
                         </Button>
                         <Button
                           type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-destructive hover:text-destructive"
+                          variant="default"
+                          size="icon"
+                          className="manage-workspaces-delete"
                           onClick={() => {
                             setDeletingTeam(t);
                             setDeleteError(null);
@@ -220,22 +238,20 @@ export function ManageWorkspacesPanel({
             </Table>
           </div>
         )}
-      </section>
+      </Card>
 
-      <section className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Workspace history</h2>
-          <p className="text-sm text-muted-foreground">
-            Record of workspaces created, renamed, and deleted on your subscription.
-          </p>
+      <Card className="manage-workspaces-card shadow-none ring-0">
+        <div className="manage-workspaces-section-header">
+          <div>
+            <h2>Workspace history</h2>
+            <p>Record of workspaces created, renamed, and deleted on your subscription.</p>
+          </div>
         </div>
 
         {events.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-            No events yet — changes will appear here.
-          </p>
+          <p className="manage-workspaces-empty">No events yet — changes will appear here.</p>
         ) : (
-          <div className="rounded-lg border border-border overflow-x-auto">
+          <div className="manage-workspaces-table">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -246,23 +262,24 @@ export function ManageWorkspacesPanel({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((ev) => (
-                  <TableRow key={ev.id}>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatEventTime(ev.createdAt)}
-                    </TableCell>
-                    <TableCell className="capitalize">{ev.action}</TableCell>
-                    <TableCell className="font-medium">{ev.teamName}</TableCell>
-                    <TableCell className="text-muted-foreground max-w-md">
-                      {eventSummary(ev)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {events.map((ev) => {
+                  const action = historyAction(ev.action);
+                  return (
+                    <TableRow key={ev.id}>
+                      <TableCell className="whitespace-nowrap">{formatEventTime(ev.createdAt)}</TableCell>
+                      <TableCell>
+                        <Badge className={action.className}>{action.label}</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{ev.teamName}</TableCell>
+                      <TableCell className="max-w-md">{eventSummary(ev)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
         )}
-      </section>
+      </Card>
 
       <Dialog
         open={editOpen}

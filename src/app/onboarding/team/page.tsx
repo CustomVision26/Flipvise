@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { createClerkClient } from "@clerk/backend";
 import { Users } from "lucide-react";
 import { getAccessContext } from "@/lib/access";
@@ -36,20 +37,25 @@ export default async function TeamOnboardingPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-start gap-8 p-4 sm:p-8 pt-10 sm:pt-16">
-      <div className="w-full max-w-xl flex flex-col gap-6">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 border border-primary/20">
-            <Users className="h-7 w-7 text-primary" />
+    <div className="create-team-page">
+      <div className="create-team-page-card">
+        <Image
+          src="/artwork/home/team-hero-robot.png"
+          alt=""
+          width={220}
+          height={220}
+          className="create-team-page-robot"
+        />
+        <div className="create-team-page-intro">
+          <div className="create-team-page-icon">
+            <Users className="h-7 w-7" aria-hidden />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Create your team</h1>
-            <p className="text-muted-foreground mt-1 text-sm max-w-md">
-              You subscribed to a team plan. Choose who this workspace is for, then
-              fill in the details. Flipvise suggests a unique workspace name from those
-              details — you can edit it before creating.
-            </p>
-          </div>
+          <h1>Create your team</h1>
+          <p>
+            You subscribed to a team plan. Choose who this workspace is for, then
+            fill in the details. Flipvise suggests a unique workspace name from those
+            details — you can edit it before creating.
+          </p>
         </div>
         <TeamOnboardingWizard planSlug={workspacePlan} />
       </div>

@@ -4,6 +4,7 @@ import * as React from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { HelpCircle, ImagePlus, Mic, Square } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -489,11 +490,18 @@ export function AddDeckDialog({
           {triggerLabel}
         </DialogTrigger>
       )}
-      <DialogContent className="mx-4 flex w-[calc(100vw-2rem)] max-h-[min(92dvh,56rem)] max-w-2xl flex-col gap-6 overflow-y-auto p-6 text-base sm:mx-auto sm:max-w-2xl sm:p-8 md:max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="create-deck-dialog deck-form-dialog mx-4 flex w-[calc(100vw-2rem)] max-h-[min(92dvh,56rem)] max-w-2xl flex-col gap-6 overflow-y-auto p-6 text-base sm:mx-auto sm:max-w-2xl sm:p-8 md:max-w-3xl">
+        <DialogHeader className="deck-form-header">
+          <Image
+            src="/artwork/home/create-deck-owl.png"
+            alt=""
+            width={220}
+            height={220}
+            className="deck-form-owl"
+          />
           <DialogTitle className="text-xl sm:text-2xl">Create a new deck</DialogTitle>
           <DialogDescription className="text-sm sm:text-base">
-            Give your deck a name/subject/course, description/topic, and optional grade and
+            Give your deck a name, subject, or course, a description or topic, and optional grade and
             difficulty.
             {showSpeechUi ? " Use the microphone to dictate into the fields." : ""}
             {showDeckFrontImage
@@ -507,7 +515,7 @@ export function AddDeckDialog({
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <Label htmlFor="deck-name">Name/Subject/Course</Label>
+                  <Label htmlFor="deck-name">Name, subject, or course</Label>
                   <Tooltip>
                     <TooltipTrigger
                       type="button"
@@ -558,7 +566,7 @@ export function AddDeckDialog({
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <Label htmlFor="deck-description">Description/Topic</Label>
+                  <Label htmlFor="deck-description">Description or topic</Label>
                   <Tooltip>
                     <TooltipTrigger
                       type="button"
@@ -728,11 +736,11 @@ export function AddDeckDialog({
           </form>
         </TooltipProvider>
 
-        <DialogFooter className="gap-2 sm:gap-3">
-          <DialogClose render={<Button variant="outline" type="button" className="h-10 sm:h-11" />}>
+        <DialogFooter className="deck-form-footer gap-2 sm:gap-3">
+          <DialogClose render={<Button variant="outline" type="button" className="deck-form-cancel h-10 sm:h-11" />}>
             Cancel
           </DialogClose>
-          <Button type="submit" form="add-deck-form" disabled={isPending} className="h-10 sm:h-11">
+          <Button type="submit" form="add-deck-form" disabled={isPending} className="deck-form-submit h-10 sm:h-11">
             {isPending ? "Creating…" : "Create Deck"}
           </Button>
         </DialogFooter>

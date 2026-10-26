@@ -44,7 +44,7 @@ export function TeacherDashboardShell({
   }, [pathname]);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 lg:flex-row lg:items-start lg:gap-8">
+    <div className="lesson-studio-shell mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 lg:flex-row lg:items-start lg:gap-8">
       <aside className="hidden w-60 shrink-0 lg:block xl:w-64">
         <div className="sticky top-20">
           <Suspense fallback={<TeacherNavSkeleton />}>

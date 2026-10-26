@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSession } from "@clerk/nextjs";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, ChevronDown, ChevronRight, Info, Search } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, House, Info, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -58,6 +59,23 @@ interface WorkspaceContextDropdownProps {
   teamDashFallback?: TeamDashFallbackTarget | null;
   /** Personal education plan (e.g. Education Plus) — show Teacher Dash on the personal row. */
   showTeacherDashboard?: boolean;
+}
+
+function workspaceArtSrc(team: TeamWorkspaceNavTeam): string {
+  const name = team.name.toLowerCase();
+  if (/class|college|university|study group|high school/.test(name)) {
+    return "/artwork/home/workspace-class.png";
+  }
+  if (/corp|company|government|business|office/.test(name)) {
+    return "/artwork/home/team-corp.png";
+  }
+  if (
+    /elementary|school|academy|primary|kindergarten/.test(name) ||
+    hasEducationPlan(team.planUrlValue)
+  ) {
+    return "/artwork/home/workspace-school.png";
+  }
+  return "/artwork/home/workspace-class.png";
 }
 
 export function WorkspaceContextDropdown({
@@ -306,7 +324,10 @@ export function WorkspaceContextDropdown({
             if ((e.target as HTMLElement).closest("[data-teacher-dash-link]")) return;
             void selectTeam(t);
           }}
-          className="cursor-pointer gap-2 items-start py-2 pr-1.5"
+          className={cn(
+            "cursor-pointer items-center gap-2 py-2 pr-1.5 workspace-switcher-row",
+            isActive && "is-active",
+          )}
           disabled={pending || !sessionLoaded}
           // Native title — do not nest Tooltip inside DropdownMenuContent (portal teardown bug).
           title={`Opens Team Dashboard Decks for “${t.name}” — team flashcard decks for this workspace`}
@@ -314,16 +335,16 @@ export function WorkspaceContextDropdown({
         >
           <Check
             className={cn(
-              "mt-0.5 size-4 shrink-0",
+              "workspace-switcher-check size-4 shrink-0",
               isActive ? "opacity-100" : "opacity-0",
             )}
             aria-hidden
           />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
-            <span className="truncate text-sm font-medium leading-tight">
+            <span className="truncate text-sm font-semibold leading-tight">
               Team: {t.name}
             </span>
-            <span className="truncate text-xs text-muted-foreground">
+            <span className="workspace-switcher-meta truncate text-xs">
               <span>{t.planLabel}</span>
               <span className="mx-1" aria-hidden>
                 ·
@@ -331,6 +352,13 @@ export function WorkspaceContextDropdown({
               <span>{t.ownerDisplayName}</span>
             </span>
           </span>
+          <Image
+            src={workspaceArtSrc(t)}
+            alt=""
+            width={72}
+            height={72}
+            className="workspace-switcher-art"
+          />
           {showAdminExpand ? (
             <Button
               data-invited-admin-expand
@@ -382,7 +410,7 @@ export function WorkspaceContextDropdown({
               type="button"
               variant="secondary"
               size="sm"
-              className="h-8 w-full text-xs font-medium"
+              className="workspace-switcher-action h-8 w-full text-xs font-medium"
               disabled={pending || !sessionLoaded}
               title={`Opens Team Admin Dashboard for “${t.name}” — members, decks, and quiz settings`}
               aria-label={`Team Admin Dashboard for ${t.name}`}
@@ -392,6 +420,13 @@ export function WorkspaceContextDropdown({
                 goToTeamAdmin(teamAdminHref);
               }}
             >
+              <Image
+                src="/artwork/home/workspace-chart.png"
+                alt=""
+                width={40}
+                height={40}
+                className="workspace-switcher-action-art"
+              />
               Team Admin Dash
             </Button>
             {showTeacherAction ? (
@@ -400,7 +435,7 @@ export function WorkspaceContextDropdown({
                 type="button"
                 variant="secondary"
                 size="sm"
-                className="h-8 w-full text-xs font-medium"
+                className="workspace-switcher-action h-8 w-full text-xs font-medium"
                 disabled={pending || !sessionLoaded}
                 title={`Opens Teacher Dashboard for “${t.name}” — AI lesson plans, quizzes, and classroom tools`}
                 aria-label={`Teacher Dashboard for ${t.name}`}
@@ -410,6 +445,13 @@ export function WorkspaceContextDropdown({
                   goToTeacherDash(t.id, t.teamMemberUrlParam);
                 }}
               >
+                <Image
+                  src="/artwork/home/workspace-teacher.png"
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="workspace-switcher-action-art"
+                />
                 Teacher Dash
               </Button>
             ) : null}
@@ -429,11 +471,12 @@ export function WorkspaceContextDropdown({
             variant="outline"
             size="sm"
             title="Switch workspace — open Personal Deck Dashboard or a Team Dashboard"
-            className="h-9 w-full min-w-0 max-w-none justify-between gap-1.5 px-2.5 font-normal sm:min-w-[10.5rem] sm:max-w-[14rem] lg:min-w-[10.5rem] lg:max-w-[14rem]"
+            className="workspace-switcher-trigger h-9 w-full min-w-0 max-w-none justify-start gap-2 px-3 font-semibold sm:min-w-[12rem] sm:max-w-[18rem]"
             aria-label={`Workspace: ${triggerLabel}. Switch between Personal Deck Dashboard and team dashboards.`}
           >
+            <House className="workspace-switcher-home size-4 shrink-0" aria-hidden />
             <span
-              className="workspace-context-trigger-label truncate text-left"
+              className="workspace-context-trigger-label min-w-0 flex-1 truncate text-left"
               title={
                 selectedTeam
                   ? `${selectedTeam.name} · ${selectedTeam.planLabel} · ${selectedTeam.ownerDisplayName}`
@@ -442,33 +485,36 @@ export function WorkspaceContextDropdown({
             >
               {triggerLabel}
             </span>
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <ChevronDown className="workspace-switcher-chevron size-4 shrink-0" aria-hidden />
           </Button>
         )}
       />
-      <DropdownMenuContent align="end" className="w-72 p-0 sm:w-80">
+      <DropdownMenuContent
+        align="end"
+        className="workspace-switcher-menu w-[22rem] max-w-[calc(100vw-1.5rem)] p-0 sm:w-[24rem]"
+      >
         <div
-          className="border-b border-border p-2"
+          className="workspace-switcher-search-wrap p-2"
           onPointerDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              className="workspace-switcher-search-icon pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2"
               aria-hidden
             />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search workspaces…"
-              className="h-9 bg-background pl-9"
+              placeholder="Search workspaces..."
+              className="workspace-switcher-search h-10 bg-background pl-9"
               autoComplete="off"
               disabled={pending || !sessionLoaded}
               aria-label="Search workspaces"
             />
           </div>
         </div>
-        <div className="max-h-64 overflow-y-scroll p-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--border))_transparent]">
+        <div className="workspace-switcher-scroll max-h-80 overflow-y-scroll p-1">
           <DropdownMenuGroup>
             {teamsNavLimited && (
               <div className="space-y-2 px-2 pb-2">
@@ -500,34 +546,43 @@ export function WorkspaceContextDropdown({
                 </Link>
               </div>
             )}
-            <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+            <DropdownMenuLabel className="workspace-switcher-label px-2 py-1.5 text-xs font-medium">
               Workspace
             </DropdownMenuLabel>
             {personalMatches && (
               <>
                 <DropdownMenuItem
                   onClick={() => void selectPersonal()}
-                  className="cursor-pointer gap-2 items-start py-2"
+                  className={cn(
+                    "cursor-pointer items-center gap-2 py-2 workspace-switcher-row",
+                    activeTeamId === null && "is-active",
+                  )}
                   disabled={pending || !sessionLoaded}
-                  // Native title — do not nest Tooltip inside DropdownMenuContent (portal teardown bug).
                   title="Opens Personal Deck Dashboard — your personal flashcard decks"
                   aria-label="Personal Deck Dashboard — your personal flashcard decks"
                 >
                   <Check
                     className={cn(
-                      "mt-0.5 size-4 shrink-0",
+                      "workspace-switcher-check size-4 shrink-0",
                       activeTeamId === null ? "opacity-100" : "opacity-0",
                     )}
                     aria-hidden
                   />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
-                    <span className="text-sm font-medium leading-tight">
+                    <span className="text-sm font-semibold leading-tight">
                       {personalPrimaryLabel}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="workspace-switcher-meta text-xs">
                       {personalPlanLabel}
                     </span>
                   </span>
+                  <Image
+                    src="/artwork/home/workspace-house.png"
+                    alt=""
+                    width={72}
+                    height={72}
+                    className="workspace-switcher-art"
+                  />
                 </DropdownMenuItem>
                 {(showTeacherDashboard || teamDashTarget != null) && (
                   <div className="grid gap-1.5 px-2 pb-1.5">
@@ -537,7 +592,7 @@ export function WorkspaceContextDropdown({
                         type="button"
                         variant="secondary"
                         size="sm"
-                        className="h-8 w-full text-xs font-medium"
+                        className="workspace-switcher-action h-8 w-full text-xs font-medium"
                         disabled={pending || !sessionLoaded}
                         title="Opens Teacher Dashboard — AI lesson plans, quizzes, and classroom tools"
                         aria-label="Teacher Dashboard — AI lesson plans, quizzes, and classroom tools"
@@ -547,6 +602,13 @@ export function WorkspaceContextDropdown({
                           goToTeacherDash();
                         }}
                       >
+                        <Image
+                          src="/artwork/home/workspace-teacher.png"
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="workspace-switcher-action-art"
+                        />
                         Teacher Dash
                       </Button>
                     ) : null}
@@ -555,7 +617,7 @@ export function WorkspaceContextDropdown({
                         type="button"
                         variant="secondary"
                         size="sm"
-                        className="h-8 w-full text-xs font-medium"
+                        className="workspace-switcher-action h-8 w-full text-xs font-medium"
                         disabled={pending || !sessionLoaded}
                         title="Opens Team Admin Dashboard — manage members, deck access, and quiz settings for your subscription"
                         aria-label="Team Admin Dashboard — manage members, deck access, and quiz settings"
@@ -569,6 +631,13 @@ export function WorkspaceContextDropdown({
                           );
                         }}
                       >
+                        <Image
+                          src="/artwork/home/workspace-chart.png"
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="workspace-switcher-action-art"
+                        />
                         Team Admin Dash
                       </Button>
                     ) : null}
@@ -581,7 +650,7 @@ export function WorkspaceContextDropdown({
               filteredTeams.length > 0 && (
                 <>
                   <div role="separator" className="-mx-1 my-1 h-px bg-border" />
-                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  <div className="workspace-switcher-label px-2 py-1.5 text-xs font-medium">
                     Invited workspaces
                   </div>
                 </>
@@ -591,7 +660,7 @@ export function WorkspaceContextDropdown({
               subscriberSectionHasRows && (
                 <>
                   <div role="separator" className="-mx-1 my-1 h-px bg-border" />
-                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  <div className="workspace-switcher-label px-2 py-1.5 text-xs font-medium">
                     Invited workspaces
                   </div>
                 </>

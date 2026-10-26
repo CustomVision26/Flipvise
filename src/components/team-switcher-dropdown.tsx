@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronDown, Search, Settings2 } from "lucide-react";
+import { Check, ChevronDown, Search, SlidersHorizontal } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -100,81 +101,100 @@ export function TeamSwitcherDropdown({
             size="sm"
             title={triggerTooltip}
             className={cn(
-              "h-9 min-w-[12rem] max-w-full justify-between gap-2 px-3 font-normal",
+              "team-switcher-trigger h-10 min-w-[12rem] max-w-full justify-start gap-2 px-2.5 font-semibold",
               menuProps.className,
             )}
             aria-label={`Current team: ${selected?.name ?? "Team"}. Open menu to switch teams.`}
             aria-describedby={ariaDescribedBy}
           >
-            <span className="truncate text-left">{selected?.name ?? "Team"}</span>
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <Image
+              src="/artwork/home/team-buildings.png"
+              alt=""
+              width={36}
+              height={36}
+              className="team-switcher-art"
+            />
+            <span className="min-w-0 flex-1 truncate text-left">{selected?.name ?? "Team"}</span>
+            <ChevronDown className="team-switcher-chevron size-4 shrink-0" aria-hidden />
           </Button>
         )}
       />
-      <DropdownMenuContent align="start" className="w-72 p-0 sm:w-80 max-w-[calc(100vw-2rem)]">
+      <DropdownMenuContent
+        align="start"
+        className="team-switcher-menu w-[22rem] max-w-[calc(100vw-1.5rem)] p-0"
+      >
         <div
-          className="border-b border-border p-2"
+          className="team-switcher-search-wrap p-3"
           onPointerDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              className="team-switcher-search-icon pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2"
               aria-hidden
             />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search teams…"
-              className="h-9 bg-background pl-9"
+              placeholder="Search teams..."
+              className="team-switcher-search h-11 bg-background pl-10"
               autoComplete="off"
               aria-label="Search teams"
             />
           </div>
         </div>
-        <div className="max-h-64 overflow-y-auto p-1">
+        <div className="team-switcher-scroll max-h-72 overflow-y-auto px-2 pb-2">
           <DropdownMenuGroup>
-            <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+            <DropdownMenuLabel className="team-switcher-label px-2 py-1.5 text-sm font-medium">
               Your teams
             </DropdownMenuLabel>
-            <DropdownMenuSeparator className="my-1" />
             {filteredTeams.map((t) => {
               const isActive = t.id === selectedId;
               return (
                 <DropdownMenuItem
                   key={t.id}
                   onClick={() => selectTeam(t)}
-                  className="cursor-pointer gap-2"
+                  className={cn(
+                    "team-switcher-row cursor-pointer items-center gap-2 py-2.5",
+                    isActive && "is-active",
+                  )}
                 >
                   <Check
                     className={cn(
-                      "size-4 shrink-0",
-                      isActive ? "text-foreground opacity-100" : "opacity-0",
+                      "team-switcher-check size-4 shrink-0",
+                      isActive ? "opacity-100" : "opacity-0",
                     )}
                     aria-hidden
                   />
-                  <span className="truncate">{t.name}</span>
+                  <span className="min-w-0 flex-1 truncate font-semibold">{t.name}</span>
+                  <Image
+                    src="/artwork/home/team-buildings.png"
+                    alt=""
+                    width={48}
+                    height={48}
+                    className="team-switcher-row-art"
+                  />
                 </DropdownMenuItem>
               );
             })}
             {filteredTeams.length === 0 && (
-              <p className="px-2 py-3 text-center text-sm text-muted-foreground">
+              <p className="team-switcher-empty px-2 py-3 text-center text-sm">
                 {q === "" ? "No teams." : "No teams match your search."}
               </p>
             )}
             {showManageWorkspaces && (
               <>
-                <DropdownMenuSeparator className="my-1" />
+                <DropdownMenuSeparator className="team-switcher-separator my-1" />
                 <DropdownMenuItem
-                  className="cursor-pointer gap-2"
+                  className="team-switcher-manage cursor-pointer gap-2 py-2.5"
                   render={<Link href={MANAGE_WORKSPACES_HREF} />}
                   onClick={() => {
                     setOpen(false);
                     setQuery("");
                   }}
                 >
-                  <Settings2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span>Manage workspaces</span>
+                  <SlidersHorizontal className="size-4 shrink-0" aria-hidden />
+                  <span className="font-semibold">Manage workspaces</span>
                 </DropdownMenuItem>
               </>
             )}

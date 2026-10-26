@@ -74,7 +74,7 @@ export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {
         onChange={setDraft}
         disabled={pending}
       />
-      <Button type="submit" disabled={pending || !canSubmit}>
+      <Button type="submit" className="create-team-submit" disabled={pending || !canSubmit}>
         {pending ? "Submitting…" : "Submit"}
       </Button>
     </form>

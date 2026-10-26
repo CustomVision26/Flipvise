@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +56,14 @@ function Field({
     </div>
   );
 }
+
+const KIND_ART: Record<WorkspaceKind, string> = {
+  corporation_government: "/artwork/home/team-corp.png",
+  education_institution: "/artwork/home/team-school.png",
+  teacher_tutor: "/artwork/home/team-teacher.png",
+  parent_guardian: "/artwork/home/team-family.png",
+  student_study_group: "/artwork/home/team-students.png",
+};
 
 export function WorkspaceCreateProfileFields({
   idPrefix,
@@ -117,9 +126,11 @@ export function WorkspaceCreateProfileFields({
   const selectedKindOption = WORKSPACE_KIND_OPTIONS.find((option) => option.value === kind);
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4", nestedInModal && "create-team-fields")}>
       <div className="space-y-2">
-        <Label id={`${idPrefix}-kind-label`}>Who is this workspace for?</Label>
+        <Label id={`${idPrefix}-kind-label`} className={nestedInModal ? "create-team-kind-heading" : undefined}>
+          Who is this workspace for?
+        </Label>
         <RadioGroup
           aria-labelledby={`${idPrefix}-kind-label`}
           value={kind}
@@ -141,8 +152,8 @@ export function WorkspaceCreateProfileFields({
             <div
               key={option.value}
               className={cn(
-                "flex items-start justify-between gap-3 rounded-lg border p-3",
-                kind === option.value && "border-primary bg-muted/40",
+                "create-team-kind flex items-center justify-between gap-3 rounded-lg border p-3",
+                kind === option.value && "is-selected",
               )}
             >
               <label
@@ -158,18 +169,28 @@ export function WorkspaceCreateProfileFields({
                   }
                 }}
               >
-                <RadioGroupItem value={option.value} className="mt-0.5" />
+                <RadioGroupItem
+                  value={option.value}
+                  className={cn("mt-0.5", nestedInModal && "create-team-radio")}
+                />
                 <span className="grid min-w-0 gap-0.5">
                   <span className="text-sm font-medium text-foreground">{option.label}</span>
                   <span className="text-xs text-muted-foreground">{option.description}</span>
                 </span>
               </label>
+              <Image
+                src={KIND_ART[option.value]}
+                alt=""
+                width={120}
+                height={120}
+                className="create-team-kind-art"
+              />
               {kind === option.value && !showAllKinds ? (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="shrink-0"
+                  className="create-team-change shrink-0"
                   disabled={disabled}
                   onClick={() => setPickingKind(true)}
                 >
@@ -188,7 +209,7 @@ export function WorkspaceCreateProfileFields({
 
       {kind !== "" && !showAllKinds ? (
         <>
-          <Alert>
+          <Alert className="create-team-example">
             <AlertTitle>Example workspace name</AlertTitle>
             <AlertDescription>
               {example.fields} becomes{" "}
@@ -301,7 +322,7 @@ export function WorkspaceCreateProfileFields({
             </Field>
           ) : null}
 
-          <Card>
+          <Card className="create-team-name-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Workspace name</CardTitle>
               <CardDescription>

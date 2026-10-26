@@ -13,7 +13,7 @@ export async function TeacherTopDashboardBar() {
     <div
       className={cn(
         teamAdminCardClass,
-        "flex flex-col gap-2 rounded-xl border border-border/80 bg-card/80 px-3 py-2.5 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3",
+        "lesson-studio-top flex flex-col gap-2 rounded-xl border border-border/80 bg-card/80 px-3 py-2.5 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3",
       )}
     >
       <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -53,9 +54,11 @@ import {
 import {
   AlertCircle,
   BookOpen,
-  CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   Pencil,
+  Settings,
+  Target,
   XCircle,
 } from "lucide-react";
 import type { EffectiveDocumentationContent } from "@/lib/documentation-effective-content";
@@ -145,11 +148,13 @@ function DocPagePanel({
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
         {locationLabel ? (
-          <p className="inline-flex rounded-md border border-border/60 bg-muted/30 px-2.5 py-1 font-mono text-xs text-muted-foreground">
+          <p className="docs-route inline-flex rounded-full px-3 py-1 font-mono text-xs">
             {locationLabel}
           </p>
         ) : null}
-        {page.id === "homepage" ? <HomepageScreenshotViewButton /> : null}
+        {page.id === "homepage" ? (
+          <HomepageScreenshotViewButton className="docs-view-btn" />
+        ) : null}
         {page.id === "personal-dashboard" ? (
           <DocsUiGuideStartButton guideId="personal-dashboard">
             Open personal dashboard guide
@@ -303,7 +308,7 @@ function DocPagePanel({
           onClick={() => onOpenArticle(page.id)}
           className={cn(
             buttonVariants({ variant: "outline", size: "sm" }),
-            "inline-flex h-9 items-center gap-2 border-primary/25 bg-primary/5 text-foreground hover:bg-primary/10",
+            "docs-depth-btn inline-flex h-9 items-center gap-2",
           )}
         >
           <BookOpen className="size-3.5 text-primary" aria-hidden />
@@ -312,7 +317,10 @@ function DocPagePanel({
       ) : null}
 
       <section className="space-y-2">
-        <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
+        <h4 className="docs-kicker">
+          <span className="docs-kicker-icon" aria-hidden>
+            <Target className="size-3.5" />
+          </span>
           Purpose
         </h4>
         <p className="text-muted-foreground">{page.purpose}</p>
@@ -321,8 +329,10 @@ function DocPagePanel({
       <Separator className="bg-border/60" />
 
       <section className="space-y-2.5">
-        <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
-          <CheckCircle2 className="size-3.5 text-primary" aria-hidden />
+        <h4 className="docs-kicker">
+          <span className="docs-kicker-icon" aria-hidden>
+            <Settings className="size-3.5" />
+          </span>
           How it works
         </h4>
         <ul className="space-y-2 text-muted-foreground">
@@ -337,9 +347,11 @@ function DocPagePanel({
 
       <Separator className="bg-border/60" />
 
-      <section className="space-y-2.5">
-        <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
-          <AlertCircle className="size-3.5 text-amber-400/90" aria-hidden />
+      <section className="docs-callout docs-callout-requirements space-y-2.5">
+        <h4 className="docs-kicker">
+          <span className="docs-kicker-icon" aria-hidden>
+            <AlertCircle className="size-3.5" />
+          </span>
           Requirements
         </h4>
         <ul className="space-y-2 text-muted-foreground">
@@ -352,9 +364,11 @@ function DocPagePanel({
         </ul>
       </section>
 
-      <section className="rounded-lg border border-destructive/25 bg-destructive/5 px-4 py-3.5">
-        <h4 className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-destructive">
-          <XCircle className="size-3.5" aria-hidden />
+      <section className="docs-callout docs-callout-stop">
+        <h4 className="docs-kicker mb-2.5">
+          <span className="docs-kicker-icon" aria-hidden>
+            <XCircle className="size-3.5" />
+          </span>
           Do not
         </h4>
         <ul className="space-y-2 text-destructive/85">
@@ -673,7 +687,12 @@ function DocArticleSectionBody({
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold tracking-tight text-foreground">{section.title}</h3>
+      <h3 className="docs-article-heading">
+        <span className="docs-article-icon" aria-hidden>
+          <BookOpen className="size-4" />
+        </span>
+        {section.title}
+      </h3>
       {guides.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           {guides.map((guide) => (
@@ -699,7 +718,7 @@ function DocArticleSectionBody({
         </ul>
       ) : null}
       {section.table ? (
-        <div className="overflow-x-auto rounded-lg border border-border/60">
+        <div className="docs-table overflow-x-auto rounded-lg">
           <table className="w-full min-w-[20rem] text-left text-sm">
             <thead>
               <tr className="border-b border-border/60 bg-muted/30">
@@ -750,8 +769,15 @@ function DocArticlePanel({
   const showSectionBack = section.pages.length > 1;
 
   return (
-    <Card className="border-primary/20 bg-card/50 shadow-none ring-1 ring-primary/15">
-      <CardHeader className="gap-2 border-b border-border/50 pb-4">
+    <Card className="docs-sheet border-0 bg-transparent shadow-none ring-0">
+      <Image
+        src="/artwork/home/docs-depth-owl.png"
+        alt=""
+        width={280}
+        height={280}
+        className="docs-sheet-owl"
+      />
+      <CardHeader className="docs-sheet-header gap-2 border-b border-border/50 pb-4">
         {onEditArticle ? (
           <Button
             type="button"
@@ -767,13 +793,13 @@ function DocArticlePanel({
         <button
           type="button"
           onClick={() => onSelect(page.id)}
-          className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="docs-back inline-flex w-fit items-center gap-1 text-xs transition-colors"
         >
           <ChevronLeft className="size-3.5" aria-hidden />
           {showSectionBack ? `${section.title} · Quick reference` : "Quick reference"}
         </button>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+          <span className="docs-depth-badge inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]">
             <BookOpen className="size-3" aria-hidden />
             In-depth guide
           </span>
@@ -797,7 +823,7 @@ function DocArticlePanel({
 function PageLocationMeta({ page }: { page: DocPage }) {
   if (page.route) {
     return (
-      <p className="font-mono text-xs text-muted-foreground">{page.route}</p>
+      <p className="docs-route inline-flex w-fit rounded-full px-3 py-1 font-mono text-xs">{page.route}</p>
     );
   }
   if (page.clerkTab) {
@@ -812,7 +838,7 @@ function PageLocationMeta({ page }: { page: DocPage }) {
 
 function DocContentSkeleton() {
   return (
-    <Card className="border-border/70 bg-card/50 shadow-none ring-1 ring-border/40">
+    <Card className="docs-sheet border-0 bg-transparent shadow-none ring-0">
       <CardHeader className="gap-2 border-b border-border/50 pb-4">
         <Skeleton className="h-6 w-48 bg-muted/40" />
         <Skeleton className="h-4 w-full max-w-md bg-muted/30" />
@@ -843,7 +869,7 @@ function PlanLimitsCard() {
   ] as const;
 
   return (
-    <Card className="border-cyan-400/30 bg-cyan-500/5 shadow-none ring-1 ring-cyan-400/20">
+    <Card className="docs-panel border-cyan-400/30 bg-cyan-500/5 shadow-none ring-1 ring-cyan-400/20">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold">
           Quick plan limits (personal)
@@ -869,7 +895,7 @@ function PlanLimitsCard() {
 
 function NeedHelpCard({ onSelect }: { onSelect: (id: string) => void }) {
   return (
-    <Card className="border-teal-400/30 bg-teal-500/5 shadow-none ring-1 ring-teal-400/20">
+    <Card className="docs-panel border-teal-400/30 bg-teal-500/5 shadow-none ring-1 ring-teal-400/20">
       <CardHeader>
         <CardTitle className="text-base font-semibold">Need help?</CardTitle>
         <CardDescription>
@@ -952,12 +978,12 @@ function TocPageItem({
         type="button"
         onClick={() => onSelect(page.id)}
         className={cn(
-          "block w-full rounded-md px-2 py-1 text-left text-xs leading-snug transition-colors hover:bg-muted/30 hover:text-foreground",
+          "docs-toc-link block w-full rounded-full px-3 py-1.5 text-left text-xs leading-snug transition-colors",
           pageActive && !articleActive
-            ? "bg-primary/10 font-medium text-foreground"
+            ? "docs-toc-active"
             : pageActive || nestedActive
-              ? "font-medium text-foreground"
-              : "text-muted-foreground",
+              ? "font-medium"
+              : "",
         )}
       >
         {page.title}
@@ -967,10 +993,8 @@ function TocPageItem({
           type="button"
           onClick={() => onSelect(docArticleHash(page.id))}
           className={cn(
-            "flex w-full items-center gap-1 rounded-md px-2 py-0.5 text-left text-[10px] leading-snug transition-colors hover:bg-primary/10 hover:text-foreground",
-            articleActive
-              ? "bg-primary/15 font-medium text-primary"
-              : "text-muted-foreground/90",
+            "docs-toc-link flex w-full items-center gap-1 rounded-full px-3 py-1 text-left text-[10px] leading-snug transition-colors",
+            articleActive && "docs-toc-active",
           )}
         >
           <BookOpen className="size-2.5 shrink-0" aria-hidden />
@@ -978,7 +1002,7 @@ function TocPageItem({
         </button>
       ) : null}
       {childrenPages.length > 0 ? (
-        <ul className="mt-1 space-y-0.5 border-l border-border/50 pl-2.5">
+        <ul className="docs-toc-pages mt-1 space-y-0.5">
           {childrenPages.map((child) => (
             <TocPageItem
               key={child.id}
@@ -1006,17 +1030,17 @@ function DocumentationToc({
 }) {
 
   return (
-    <nav aria-label="Documentation sections" className="space-y-5">
+    <nav aria-label="Documentation sections" className="flex flex-col gap-3">
       <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         On this page
       </p>
-      <div className="space-y-4">
+      <div className="flex flex-col gap-3">
         <button
           type="button"
           onClick={() => onSelect("")}
           className={cn(
-            "block w-full rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted/40",
-            !activeId && "bg-muted/60 text-foreground",
+            "docs-toc-link block w-full rounded-full px-3 py-1.5 text-left text-sm font-medium transition-colors",
+            !activeId && "docs-toc-active",
           )}
         >
           Overview
@@ -1029,19 +1053,19 @@ function DocumentationToc({
           const { roots, childrenByParent } = groupDocPagesByParent(section.pages);
 
           return (
-            <div key={section.id} className="space-y-1.5">
+            <div key={section.id} className="space-y-1">
               <button
                 type="button"
                 onClick={() => onSelect(section.id)}
                 className={cn(
-                  "block w-full rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted/40",
-                  sectionActive && activeId === section.id && "bg-muted/60 text-foreground",
-                  sectionActive && activeId !== section.id && "text-foreground",
+                  "docs-toc-section flex w-full items-center justify-between gap-2 rounded-full px-3 py-1.5 text-left text-sm font-medium transition-colors",
+                  sectionActive && activeId === section.id && "docs-toc-active",
                 )}
               >
-                {section.title}
+                <span>{section.title}</span>
+                <ChevronDown className="size-3.5 shrink-0" aria-hidden />
               </button>
-              <ul className="space-y-0.5 border-l border-border/60 pl-3">
+              <ul className="docs-toc-pages space-y-0.5">
                 {roots.map((page) => (
                   <TocPageItem
                     key={page.id}
@@ -1083,7 +1107,7 @@ function DocContentPanel({
     return (
       <div className="space-y-6">
         <PlanLimitsCard />
-        <Card className="border-cyan-400/25 bg-card/50 shadow-none ring-1 ring-cyan-400/15">
+        <Card className="docs-panel border-cyan-400/25 bg-card/50 shadow-none ring-1 ring-cyan-400/15">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Browse the guide</CardTitle>
             <CardDescription>
@@ -1118,7 +1142,7 @@ function DocContentPanel({
       ...(childrenByParent.get(page.id) ?? []),
     ]);
     return (
-      <Card className="border-border/70 bg-card/50 shadow-none ring-1 ring-border/40">
+      <Card className="docs-sheet border-0 bg-transparent shadow-none ring-0">
         <CardHeader className="gap-1 border-b border-border/50 pb-4">
           <CardTitle className="text-lg font-semibold">{section.title}</CardTitle>
           <CardDescription>{section.description}</CardDescription>
@@ -1160,13 +1184,20 @@ function DocContentPanel({
     : undefined;
 
   return (
-    <Card className="border-border/70 bg-card/50 shadow-none ring-1 ring-border/40">
-      <CardHeader className="gap-2 border-b border-border/50 pb-4">
+    <Card className="docs-sheet border-0 bg-transparent shadow-none ring-0">
+      <Image
+        src="/artwork/home/docs-article-owl.png"
+        alt=""
+        width={280}
+        height={280}
+        className="docs-sheet-owl"
+      />
+      <CardHeader className="docs-sheet-header gap-2 border-b border-border/50 pb-4">
         {parentPage ? (
           <button
             type="button"
             onClick={() => onSelect(parentPage.id)}
-            className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="docs-back inline-flex w-fit items-center gap-1 text-xs transition-colors"
           >
             <ChevronLeft className="size-3.5" aria-hidden />
             {parentPage.title}
@@ -1175,7 +1206,7 @@ function DocContentPanel({
           <button
             type="button"
             onClick={() => onSelect(section.id)}
-            className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="docs-back inline-flex w-fit items-center gap-1 text-xs transition-colors"
           >
             <ChevronLeft className="size-3.5" aria-hidden />
             {section.title}
@@ -1275,14 +1306,31 @@ export function UserDocumentationView({
   );
 
   return (
-    <div className={cn("mx-auto w-full max-w-6xl", embedded ? "space-y-4" : "space-y-10")}>
+    <div className={cn("docs-page mx-auto w-full max-w-6xl", embedded ? "space-y-4" : "space-y-10")}>
       {!embedded ? (
-        <PublicPageIntro
-          badge="User guide"
-          title="Flipvise Documentation"
-          description="Quick reference and in-depth guides for every customer-facing screen — purpose, workflows, plan requirements, and restrictions."
-          accent="cyan"
-        />
+        <div className="docs-hero">
+          <Image
+            src="/artwork/home/docs-fox.png"
+            alt=""
+            width={220}
+            height={220}
+            className="docs-fox"
+          />
+          <Image
+            src="/artwork/home/docs-owl.png"
+            alt=""
+            width={240}
+            height={240}
+            className="docs-owl"
+          />
+          <PublicPageIntro
+            badge="User guide"
+            title="Flipvise Documentation"
+            description="Quick reference and in-depth guides for every customer-facing screen — purpose, workflows, plan requirements, and restrictions."
+            accent="cyan"
+            className="docs-intro"
+          />
+        </div>
       ) : null}
 
       {mounted ? (
@@ -1290,22 +1338,24 @@ export function UserDocumentationView({
           sections={sections}
           getArticle={getArticle}
           onNavigate={selectTarget}
+          className="docs-search"
+          showSearchButton
         />
       ) : (
         <Skeleton className="h-11 w-full rounded-md bg-muted/30" />
       )}
 
-      <div className="grid items-start gap-8 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)] xl:gap-10">
+      <div className="grid items-stretch gap-8 lg:grid-cols-[16.5rem_minmax(0,1fr)] xl:gap-10">
         <aside
           className={cn(
-            "lg:sticky lg:top-20 lg:self-start",
+            "min-h-0 lg:relative",
             documentationTocAsideClass(mobileContentOpen, mounted),
           )}
         >
           <div
             className={cn(
-              "rounded-xl border border-cyan-400/25 bg-card/50 p-4 ring-1 ring-cyan-400/15",
-              "max-h-[calc(100vh-6rem)] overflow-y-auto lg:p-5",
+              "docs-sidebar rounded-xl border border-cyan-400/25 bg-card/50 p-4 ring-1 ring-cyan-400/15",
+              "lg:absolute lg:inset-0 lg:overflow-y-auto lg:p-5",
             )}
           >
             {mounted ? (

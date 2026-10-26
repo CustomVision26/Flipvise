@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useTransition } from "react";
 import { Mic, Moon, Sun } from "lucide-react";
+import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ import {
 import { setFreeUiThemeAction } from "@/actions/free-ui-theme";
 import { AppearanceSettingsSection } from "@/components/illustrated/appearance-settings-section";
 import { MicrophoneSettingsDialog } from "@/components/microphone-settings-dialog";
+import { playStarThemeChange } from "@/lib/star-theme-transition";
 
 export interface UserAppearanceSettingsPageProps {
   currentProTheme?: ProUiThemeId;
@@ -74,23 +76,42 @@ export function UserAppearanceSettingsPage({
     mounted && (theme === "light" || theme === "dark") ? theme : "dark";
 
   return (
-    <div className="space-y-4 px-1 pb-4">
-      <Card size="sm">
-        <CardHeader className="border-b border-border pb-3">
+    <div className="account-clerk-page account-appearance-page space-y-4 px-1 pb-4">
+      <Card size="sm" className="account-clerk-card">
+        <CardHeader className="account-clerk-header border-b border-border pb-3">
+          <Image
+            src="/artwork/home/appearance-owl.png"
+            alt=""
+            width={180}
+            height={180}
+            className="account-clerk-owl"
+          />
           <CardTitle className="text-base">Theme mode</CardTitle>
           <CardDescription>
             Light or dark base theme for the app.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
-          <div className="flex flex-wrap gap-2">
+          <div className="account-theme-switch flex flex-wrap gap-2">
             <Button
               type="button"
               variant={activeTheme === "light" ? "default" : "outline"}
               size="sm"
-              className="gap-2"
-              onClick={() => setTheme("light")}
+              className="account-theme-light relative gap-2 overflow-visible"
+              onClick={(event) =>
+                playStarThemeChange({
+                  button: event.currentTarget,
+                  next: "light",
+                  current: activeTheme,
+                  apply: () => setTheme("light"),
+                })
+              }
             >
+              <span className="account-theme-stars" aria-hidden>
+                <span />
+                <span />
+                <span />
+              </span>
               <Sun className="size-4 text-muted-foreground" aria-hidden />
               Light
             </Button>
@@ -98,9 +119,21 @@ export function UserAppearanceSettingsPage({
               type="button"
               variant={activeTheme === "dark" ? "default" : "outline"}
               size="sm"
-              className="gap-2"
-              onClick={() => setTheme("dark")}
+              className="account-theme-dark relative gap-2 overflow-visible"
+              onClick={(event) =>
+                playStarThemeChange({
+                  button: event.currentTarget,
+                  next: "dark",
+                  current: activeTheme,
+                  apply: () => setTheme("dark"),
+                })
+              }
             >
+              <span className="account-theme-stars" aria-hidden>
+                <span />
+                <span />
+                <span />
+              </span>
               <Moon className="size-4 text-muted-foreground" aria-hidden />
               Dark
             </Button>

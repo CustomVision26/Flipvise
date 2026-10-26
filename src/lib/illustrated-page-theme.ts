@@ -1,4 +1,5 @@
 import {
+  nextBackgroundSubject,
   resolveSubjectArtwork,
   type SubjectKey,
 } from "@/lib/illustrated-appearance";
@@ -102,6 +103,20 @@ const THEMES: Record<SubjectKey, Omit<IllustratedPageTheme, "subject">> = {
     transparent: true,
   },
 };
+
+export function illustratedThemeForSubject(subject: SubjectKey): IllustratedPageTheme {
+  return { subject, ...THEMES[subject] };
+}
+
+/** Scene 0 keeps the deck's own artwork. Later steps walk the woodland scenes. */
+export function rotateIllustratedPageTheme(
+  base: IllustratedPageTheme,
+  step: number,
+): IllustratedPageTheme {
+  const subject = nextBackgroundSubject(base.subject, step);
+  if (subject === base.subject) return base;
+  return illustratedThemeForSubject(subject);
+}
 
 /** Page background for the subject already chosen by the shared artwork resolver. */
 export function resolveIllustratedPageTheme(input: {

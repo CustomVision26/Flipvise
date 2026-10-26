@@ -9,7 +9,7 @@ Optional cartoon artwork for decks and study screens. The standard design stays 
 3. Turn on **Enable Illustrated Deck Design** and choose **Save changes**.
 4. Each user turns it on under **Manage account → Appearance → Illustrated Deck Design**.
 
-Effective design is on only when the admin switch and that user's preference are both on, and the account is on any plan except Free. Free always uses the standard design. A saved preference is kept and returns if the account later moves to a paid plan. Turning the admin switch off does not erase user preferences. Turning it back on restores them.
+Effective design is on only when the admin switch and that user's preference are both on. Every plan, including Free, may use cartoon artwork, backgrounds, and layered cards. A saved preference is kept. Turning the admin switch off does not erase user preferences. Turning it back on restores them.
 
 ## Artwork
 
@@ -25,6 +25,10 @@ A saved cover image is still used for a deck's own cover. Study screens, the dec
 Image generation still checks the reference bank first. When the question or answer names a scene (for example photosynthesis or algebra), Flipvise uses the local tile and does not call the online image model or charge an image quota. If nothing in the bank matches, generation continues online in the same cartoon style.
 
 Replace a file in `tiles/` to change a generated scene. Keep the same file name. Keep titles, questions, and controls as HTML. Do not put answer text in the artwork.
+
+## Background changes
+
+Manage account → Appearance includes **Change background artwork**. When that switch is on, the current scene stays for the number of hours on the slider, from 2 hours to 24 hours, then moves to the next scene on the page background, the dashboard, and study screens. Changing the hours or turning the switch on starts that wait from the moment you save. Turning the switch off keeps the scene that is already showing. The default is on, every 24 hours.
 
 ## Motion
 

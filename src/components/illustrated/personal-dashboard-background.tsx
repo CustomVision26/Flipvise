@@ -2,6 +2,15 @@
 
 import Image from "next/image";
 import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
+import {
+  useBackgroundRotationNow,
+  useEffectiveRotationStart,
+} from "@/components/illustrated/use-background-rotation";
+import { backgroundSceneStep } from "@/lib/illustrated-appearance";
+import {
+  illustratedThemeForSubject,
+  rotateIllustratedPageTheme,
+} from "@/lib/illustrated-page-theme";
 
 const DASHBOARD_ART = [
   {
@@ -25,20 +34,58 @@ const DASHBOARD_ART = [
 ] as const;
 
 export function PersonalDashboardBackground() {
-  const { effectiveIllustratedDesign } = useIllustratedAppearance();
-  if (!effectiveIllustratedDesign) return null;
+  const appearance = useIllustratedAppearance();
+  const rotating = appearance.effectiveIllustratedDesign && appearance.backgroundChangeEnabled;
+  const startedAt = useEffectiveRotationStart(
+    appearance.backgroundRotationStartedAt,
+    rotating,
+  );
+  const now = useBackgroundRotationNow(
+    rotating,
+    appearance.backgroundChangeHours,
+    startedAt,
+  );
+  if (!appearance.effectiveIllustratedDesign) return null;
+
+  const step = backgroundSceneStep({
+    nowMs: now,
+    startedAtMs: startedAt ? Date.parse(startedAt) : null,
+    hours: appearance.backgroundChangeHours,
+    enabled: rotating,
+  });
+  const scene =
+    step > 0
+      ? rotateIllustratedPageTheme(illustratedThemeForSubject("general"), step)
+      : null;
+  const art = scene
+    ? [
+        {
+          src: scene.left ?? DASHBOARD_ART[0].src,
+          className: DASHBOARD_ART[0].className,
+          width: scene.leftWidth,
+          height: scene.leftHeight,
+        },
+        DASHBOARD_ART[1],
+        {
+          src: scene.right ?? DASHBOARD_ART[2].src,
+          className: DASHBOARD_ART[2].className,
+          width: scene.rightWidth,
+          height: scene.rightHeight,
+        },
+      ]
+    : DASHBOARD_ART;
 
   return (
     <div className="personal-dashboard-bg" aria-hidden>
-      {DASHBOARD_ART.map((art) => (
+      {art.map((item) => (
         <Image
-          key={art.src}
-          src={art.src}
+          key={item.className}
+          src={item.src}
           alt=""
-          width={art.width}
-          height={art.height}
+          width={item.width}
+          height={item.height}
           unoptimized
-          className={art.className}
+          className={item.className}
         />
       ))}
     </div>

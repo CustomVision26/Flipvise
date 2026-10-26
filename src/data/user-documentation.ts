@@ -20,7 +20,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "The page footer shows the Flipvise Studio support email, phone, WhatsApp number, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
           "After you sign in, you are redirected to your personal dashboard. If required account details are incomplete, you complete them on the account-information form before the dashboard becomes available. That form uses purple step tabs, rounded fields, and an owl illustration, and stays readable in light and dark theme.",
-          "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse — including Create a deck, deck editor card walkthroughs, and Education Teacher guides under Team Tier Plan (AI Lesson Builder for the plan owner, AI Lesson Builder for a new deck, AI Quiz/Test Generator from a lesson plan, and AI Quiz/Test Generator for an existing deck, Homework Generator from a deck, Homework Generator from a lesson plan, Study Guide Generator from a lesson plan, Worksheet Generator from a lesson plan, Classes for the plan owner, Student Progress for the plan owner, Register a student for the plan owner, Student quiz results for the plan owner, Manual assignment grades for the plan owner, Quiz grades for the plan owner, and Teacher Resource Library for the plan owner).",
+          "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse — including Create a deck, deck editor card walkthroughs, and Education Teacher guides under Team Tier Plan (AI Lesson Builder for the plan owner, AI Lesson Builder for a new deck, AI Quiz/Test Generator from a lesson plan, and AI Quiz/Test Generator for an existing deck, Homework Generator from a deck, Homework Generator from a lesson plan, Study Guide Generator from a lesson plan, Worksheet Generator from a lesson plan, Classes for the plan owner, Student Progress for the plan owner, Register a student for the plan owner, Student quiz results for the plan owner, Manual assignment grades for the plan owner, Quiz grades for the plan owner, and Teacher Resource Library for the plan owner). The catalog window is a solid illustrated panel with a reading owl, colored guide icons, and step counts, and it stays readable in light and dark. Each documentation article, in-depth guide, and the View screenshot window is a solid illustrated panel with a reading owl, purple controls, and gold and red callouts, readable in light and dark.",
         ],
         requirements: ["None — guests can browse pricing and documentation."],
         doNots: [
@@ -38,10 +38,10 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Documentation opens this guide.",
           "Plans opens Plans & Pricing so you can compare tiers and start checkout. Complimentary, assigned, or affiliate access still uses the Plans label — hover the button to confirm it is not a paid subscription.",
           "Contact Us appears in the top nav for guests only — it opens the public Contact Support page with live chat.",
-          "Signed-in users open Documentation from the book icon beside Help and Inbox (right side of the header). Plans also appears as a header link next to Teacher and Affiliate.",
+          "Signed-in users open Documentation from the book icon beside Help and the bell (right side of the header). Plans is an outline pill, and the plan name is a gold badge with a crown.",
           "UI Guides in the header opens a catalog grouped as Getting started, Decks and cards, and Team Tier Plan. Education Teacher is nested under Team Tier Plan and includes Teacher Dashboard, AI Lesson Builder for the plan owner, AI Lesson Builder for a new deck, AI Quiz/Test Generator from a lesson plan, and AI Quiz/Test Generator for an existing deck, Homework Generator from a deck, Homework Generator from a lesson plan, Study Guide Generator from a lesson plan, Worksheet Generator from a lesson plan, Classes for the plan owner, Student Progress for the plan owner, Register a student for the plan owner, Student quiz results for the plan owner, Manual assignment grades for the plan owner, Quiz grades for the plan owner, and Teacher Resource Library for the plan owner. Guests see it in the top nav; signed-in users see it beside Inbox.",
           "Guest homepage nav shows Plans and Contact Us; on Documentation or Contact Us you also see Home and Documentation.",
-          "Signed-in users also see plan label, workspace switcher, inbox, UI Guides, and account menu. The plan name opens Account → Billing (current plan, complimentary badge, and plan history). Hover the plan name to confirm grant access is not a paid subscription.",
+          "Signed-in users also see a gold plan badge, a blue account button, workspace switcher, bell, UI Guides, and account menu. The workspace menu is a searchable list with Personal Dash and invited workspaces, each with its own artwork, and stays readable in light and dark. The plan name opens the same Manage account window on Billing, with Account details, Appearance, and Billing filled in. Clicking the photograph in the account menu opens a formal portrait dialog. Hover the plan name to confirm grant access is not a paid subscription.",
           "Personal Dash is /dashboard; invited workspaces use /dashboard?team=<id> — Clerk user ids are not placed in the address bar.",
         ],
         requirements: ["Signed in for inbox and account controls."],
@@ -65,12 +65,12 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Open personal dashboard guide to walk through the dashboard, inbox, Help Center, documentation, New Deck, and Manage account screens in order. The guide stays open while you browse.",
           "The heading shows Personal Dashboard : your name, or your email if no name is on the account.",
-          "View decks in grid, list, or compact tiles. Hover a deck tile to preview the cover image when one is set. Deck cards use a colored accent, a short entrance, and a hover shine. A chosen background gradient or cover image stays on the card. When Illustrated Deck Design is on, grid and compact tiles show subject artwork and a layered card stack; list view stays a row. The workspace heading and deck list panel are clear so the artwork background shows through, and the Showing line and View controls use a light surface so they stay readable.",
+          "View decks in grid, list, or compact tiles. Hover a deck tile to preview the cover image when one is set. Deck cards use a colored accent, a short entrance, and a hover shine. A chosen background gradient or cover image stays on the card. When Illustrated Deck Design is on, grid and compact tiles show subject artwork and a layered card stack; list view stays a row. The workspace heading shows graduation books and a purple New Deck button. Finish team setup, when shown, is a card with a robot and a purple Continue setup button. Those cards stay readable in light and dark. An empty library shows an owl and Create your first deck. The Flipvise logo is not used on that empty state. Invited Team Dashboard screens are drawn from this same page.",
           "On Education Gold and Education Enterprise, personal decks stay in the Personal section. Below that, the Workspace menu shows the workspace name. Choose a workspace to see decks created by a team admin separate from your lesson-plan decks. A lesson-plan deck you save from a team admin’s deck is stored only under Owner lesson plans and is not copied onto that team admin’s Team Dashboard. The AI Lesson Builder for the plan owner guide and the AI Lesson Builder for a new deck guide both show that Owner lesson plans group after Save Lesson Plan.",
-          "Add Deck opens the creation dialog: name/subject/course, description/topic, grade level, difficulty, optional deck cover image, and background gradient. Open create deck guide from Deck Editor to walk through that flow.",
+          "Add Deck opens the creation dialog: name, subject, or course, description or topic, grade level, difficulty, optional deck cover image, and background gradient. Open create deck guide from Deck Editor to walk through that flow.",
           "Edit deck (from a deck card menu) updates the same metadata and optional cover image; the cover is not a flashcard.",
           "Delete deck asks for confirmation. On Education plans, the dialog lists permanent losses (cards, assignments, classes). Linked lesson plans stay in the Resource Library — Edit and Create Quiz remain available when another related deck can keep the link, and become unavailable only when deleting the last linked deck. On a non-Education plan, if the deck still has linked lesson plans from a previous Education subscription, the dialog warns that the Education lesson-plan link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
-          "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
+          "The two premium add-ons sit beside the logo as glossy pills, and again under the logo on small screens: pink Live Classroom and teal AI Essay. A leading Flipvise is left off those header labels. Locked pills open Unlock Feature; unlocked AI Essay opens the AI Essay workspace. Plans, the gold plan badge, the blue account button, round book, help, and bell buttons, and UI Guides stay readable in light and dark. The UI Guides catalog is a solid illustrated window with a reading owl and colored guide icons. Documentation articles for this dashboard are solid illustrated panels with a reading owl.",
           "A Live Classroom™ button appears on Personal Dashboard only when that add-on is paid or assigned (admin grant) on your account.",
           "Click a deck to edit cards or start studying.",
           "Usage banners show deck and card limits for your current plan.",
@@ -102,9 +102,9 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Invited team members and co-admins study or preview decks inside a workspace.",
         howItWorks: [
-          "Invited users switch to a workspace from the header dropdown to open Team Dashboard. The page uses the same colored wash, header bar, and deck cards as Personal Dashboard. Open assign deck to member in a workspace guide to follow an assignment through the member’s Team Dashboard, Preview cards, and Study. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck.",
+          "Invited users switch to a workspace from the header dropdown to open Team Dashboard. The heading is a solid card with an owl on a stack of books, and an empty library is a solid card with a reading robot, a telescope, and a lightbulb. Those cards stay readable in light and dark. The Flipvise logo is not used on that empty state. Deck lists still let artwork show through. Personal Dashboard can show a Finish team setup card with a robot and a purple Continue setup button. Open assign deck to member in a workspace guide to follow an assignment through the member’s Team Dashboard, Preview cards, and Study. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck.",
           "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
-          "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
+          "The two premium add-ons sit beside the logo as glossy pills, and again under the logo on small screens: pink Live Classroom and teal AI Essay. A leading Flipvise is left off those header labels. Locked pills open Unlock Feature; unlocked AI Essay opens the AI Essay workspace. Plans, the gold plan badge, the blue account button, round book, help, and bell buttons, and UI Guides stay readable in light and dark.",
           "Assigned members see only decks assigned to them. Education team admins see owner-assigned decks grouped above a divider from decks they created. A lesson-plan deck the workspace owner saves from a team-admin deck stays on the owner’s Personal Dashboard and is not listed here. Click a deck once to open its menu (Study and Preview cards). Open deck, Edit deck, and Delete deck appear only for decks you may change. Hover a deck tile to preview its cover image when one is set. Card counts exclude the optional deck cover image — it is not a flashcard. Illustrated Deck Design, when enabled in Appearance, uses the same artwork on these tiles, and the deck list panel stays clear so that artwork shows through.",
           "Team context is stored in a cookie when invited members switch workspaces.",
           "Plan owners create, rename, and delete workspaces from Manage Workspaces, listed under this topic in the sidebar.",
@@ -128,8 +128,9 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Team and Education team subscribers create, rename, delete, and review history for owned team workspaces.",
         howItWorks: [
           "Add workspaces up to your plan’s workspace limit from this page (Education Gold and Education Enterprise included). Open create workspace guide to follow adding another workspace from Team Admin or Manage workspaces. On Team Admin the control is a purple Add Workspace button beside Info. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. Open it from Team Admin → Add Workspace or the team switcher → Manage workspaces. Choose who the workspace is for, then fill in the matching fields (Change hides those fields until you pick again); Flipvise suggests an abbreviated name you can edit before creating (duplicate auto-generated names get a suffix such as -2).",
+          "The team switcher opens a searchable list of your teams, with building artwork, a purple check on the selected team, and Manage workspaces. That menu stays readable in light and dark.",
           "Rename or delete workspaces you own.",
-          "Workspace history shows create/rename/delete audit events.",
+          "Workspace history shows create/rename/delete audit events on solid cards, with a gold plan badge and colored Created, Renamed, and Deleted labels that stay readable in light and dark. Create a team opens in a dialog with illustrated choices and artwork beside each option, a purple close button, and Cancel and Create team controls that stay readable in light and dark.",
         ],
         requirements: [
           "Active team-tier or education team plan (Team Basic, Team Gold, Platinum, Enterprise, Education Gold, or Education Enterprise).",
@@ -153,7 +154,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/decks/[deckId]",
         purpose: "View and edit deck metadata and individual flashcards.",
         howItWorks: [
-          "Deck header shows card count vs plan cap, a Free plan, Paid plan, or Complimentary badge (hover Paid plan or Complimentary for your tier and cards-per-deck limit; Complimentary means grant access, not a Stripe subscription), and last updated date. When Illustrated Deck Design is on, a subject banner sits above this header and the cards panel is clear so the artwork background shows through. Compact view shows illustrated card tiles; grid stays a table and list stays a list. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck.",
+          "Deck header shows card count vs plan cap, a Free plan, Paid plan, or Complimentary badge (hover Paid plan or Complimentary for your tier and cards-per-deck limit; Complimentary means grant access, not a Stripe subscription), and last updated date. When Illustrated Deck Design is on, a subject banner sits above this header and the cards panel is clear so the artwork background shows through. Compact view shows illustrated card tiles; grid stays a table and list stays a list. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. That catalog is a solid illustrated window with a reading owl and colored guide icons, readable in light and dark. The deck editor documentation article is a solid illustrated panel with a reading owl.",
           "Generate cards with AI on eligible plans. The panel notes that the topic you submit is sent to OpenAI and links to AI data handling.",
           "AI reads your deck name, description, and existing cards to match topic, tone, and format — add a few representative cards first for the most consistent results.",
           "Empty decks have only the name and description to guide AI, so the first generated batch may be less predictable until you refine cards or add manual examples.",
@@ -166,6 +167,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "From source review: Swap flips front and back before save; choose whether quiz wrong answers match the original answer (default) or original question/term.",
           "From source review: preview and edit three quiz wrong answers per card before saving; Regenerate refreshes them from AI.",
           "Upload a deck cover image when creating or editing a deck. The cover appears on dashboard deck cards and is not counted as a flashcard.",
+          "Create a new deck and Edit deck open in illustrated dialogs with an owl, rounded fields, a purple close button, and Cancel plus Create Deck or Save Changes. Edit deck is wide enough for the owl and the fields. Name and description labels do not use slash separators, and stray backslashes are left out of the saved name, description, and grade. Those dialogs stay readable in light and dark.",
           "Open create deck guide from Editor features to walk through + New Deck, details, cover image, and the new deck on Personal Dashboard.",
           "Open AI created cards, manual cards, and manual MCQ guides from Getting reliable AI-generated cards to walk through batch Generate, Standard, and Multiple Choice.",
           "Open add from source guide from From source — review, swap, and quiz distractors to walk through URL or file import, review, and save.",
@@ -195,7 +197,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "AI Recall™ asks you to answer (type, voice mic, or draw) before unlocking the solution; AI evaluates understanding (feedback shown; score/confidence percentages are hidden). Requires Pro Plus / Education Plus / team plans and internet; offline users continue with Standard Review.",
           "AI Recall™ session complete shows Reviewed / Correct / Incorrect / Forced unlocks, Session score (correct ÷ reviewed), and an AI motivational quote with author (tiers: under 50% improve, 50–90% encourage, over 90% flower of excellence). Results are not saved automatically.",
           "Double-click a front or back card image during flashcard review to enlarge it; press Escape or click outside to close.",
-          "Quiz mode supports multiple question formats: multiple choice, true/false, and fill-in-the-blank. A finished score over 90% shoots confetti in from both sides of the screen. Two light beams travel around cards, dialogs, and study panels. Reduced motion skips both.",
+          "Quiz mode supports multiple question formats: multiple choice, true/false, and fill-in-the-blank. A finished score over 90% shoots confetti in from both sides of the screen. The result card, quote, and review stay on solid surfaces with colored Correct, Incorrect, and Unanswered tiles. Two light beams travel around cards, dialogs, and study panels. Reduced motion skips both.",
           "The quiz start screen lists enabled formats and shows how many of each type appear in this session (e.g. 5 MCQ, 2 True/False, 3 Fill in the blank).",
           "Pro Plus and Education Plus deck owners (paid, admin-assigned, or affiliate) see Format Quiz Question on the quiz lobby — enable formats, set Questions per format counts, set a Quiz time limit (minutes), Generate AI quiz sentences when needed, then Publish to quiz (or Republish to quiz).",
           "When a team admin (or you via Format Quiz Question) has published a question distribution, the lobby mix matches those exact counts. Open quiz formats for a workspace guide to follow Team Admin formats through the member Timed quiz lobby.",
@@ -227,7 +229,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/dashboard/quiz-results/[resultId]",
         purpose: "Full breakdown of a quiz attempt opened from your inbox.",
         howItWorks: [
-          "Shows score, answers, and timing for a specific quiz result.",
+          "Shows score, answers, and timing for a specific quiz result on solid cards that stay readable in light and dark.",
           "Each question in the review lists its format (MCQ, True/False, or Fill in the blank) next to the question number.",
           "Linked from inbox notifications for team quiz activity. Open quiz results for a workspace guide to follow Team Admin Quiz results through the member’s saved score and Review. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck.",
           "PDF downloads include the format label on each question when available.",
@@ -291,7 +293,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Unified notification center for invites, billing, quiz results, affiliate messages, support tickets, and your one-time welcome message.",
         howItWorks: [
-          "Inbox tab shows unread and actionable items.",
+          "Inbox tab shows unread and actionable items. The page is a solid illustrated board with a messenger owl, a fox, and purple Inbox and Open controls, and it stays readable in light and dark.",
           "History tab shows completed or read items.",
           "New accounts receive a formal Welcome to Flipvise message with getting-started tips.",
           "After sign-in on web, PWA, or the mobile app, a brief welcome toast appears at the top of the screen.",
@@ -322,7 +324,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Side panel for submitting support tickets and tracking replies without leaving Flipvise.",
         howItWorks: [
           "Open the Help Center section in Documentation (/docs#help-center-overview) for ticket categories and workflows.",
-          "The landing screen lists every ticket category — tap a row to open its form.",
+          "The landing screen lists every ticket category — tap a row to open its form. The drawer shows a waving robot, a colored icon on each row, and solid cards that stay readable in light and dark.",
           "Use ← Back in the sheet header to return to the category list.",
           "Closing the sheet resets to the landing screen.",
           "After a successful submission you see a confirmation and can submit another request.",
@@ -345,7 +347,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "General help for anything not covered by a more specific category.",
         howItWorks: [
-          "Fields: Subject (required), Message (required, minimum 10 characters), optional screenshot.",
+          "Fields: Subject (required), Message (required, minimum 10 characters), optional screenshot. The Help Center drawer uses a waving robot and colored category icons, and stays readable in light and dark.",
           "Screenshot uploader accepts JPEG, PNG, WebP, or GIF up to 10 MB — click, drag-and-drop, or remove before sending.",
           "Submit with Send Request; a ticket is created and routed to the support team.",
           "Use for how-to questions, unexpected behaviour, or issues that do not fit Billing, Account, or Bug Report.",
@@ -363,7 +365,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Report broken behaviour, errors, or data problems with structured severity.",
         howItWorks: [
-          "Fields: Bug Summary (required), Severity dropdown, Steps to Reproduce (required, min 10 characters), optional screenshot.",
+          "Fields: Bug Summary (required), Severity dropdown, Steps to Reproduce (required, min 10 characters), optional screenshot. The Help Center drawer uses a waving robot and a colored bug icon, and stays readable in light and dark.",
           "Severity options: Low (cosmetic), Normal (partial functionality), High (feature blocked), Urgent (app broken or data loss).",
           "Write numbered reproduction steps (e.g. “1. Open deck… 2. Click Study… 3. Error appears”).",
           "Submit with Report Bug (destructive-styled button).",
@@ -382,7 +384,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Suggest new product capabilities or improvements to existing features.",
         howItWorks: [
-          "Fields: Feature Title (required), Description & Use-case (required, min 10 characters), optional mockup/reference image.",
+          "Fields: Feature Title (required), Description & Use-case (required, min 10 characters), optional mockup/reference image. The Help Center drawer uses a waving robot and a colored lightbulb icon, and stays readable in light and dark.",
           "Explain who benefits and how the feature would be used in your workflow.",
           "Optional image helps illustrate layout or workflow ideas.",
           "Submit with Submit Request; requests are reviewed but not guaranteed to ship.",
@@ -400,7 +402,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Share overall experience, satisfaction, and qualitative thoughts about Flipvise.",
         howItWorks: [
-          "Fields: Overall Rating (1–5 stars, optional), Subject (defaults to “App Feedback”), Your Feedback (required, min 5 characters), optional attachment.",
+          "Fields: Overall Rating (1–5 stars, optional), Subject (defaults to “App Feedback”), Your Feedback (required, min 5 characters), optional attachment. The Help Center drawer uses a waving robot and a colored star icon, and stays readable in light and dark.",
           "Star rating is included in the ticket message sent to support.",
           "Use for praise, UX suggestions, or general comments that are not bug reports or feature specs.",
           "Submit with Send Feedback.",
@@ -417,7 +419,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Resolve subscription charges, refunds, plan mismatches, and Stripe billing issues.",
         howItWorks: [
-          "Fields: Issue Summary (required), Details (required, min 10 characters), optional attachment (e.g. invoice screenshot).",
+          "Fields: Issue Summary (required), Details (required, min 10 characters), optional attachment (e.g. invoice screenshot). The Help Center drawer uses a waving robot and a colored card icon, and stays readable in light and dark.",
           "Include charge dates, amounts, plan names, or Stripe receipt details in Details.",
           "Submit with Submit Billing Request.",
           "For self-service changes (upgrade, cancel, payment method), also try Account → Billing or the Stripe portal from the pricing page.",
@@ -438,7 +440,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Problems with sign-in, profile, access, data export, or account settings.",
         howItWorks: [
-          "Fields: Issue Summary (required), Details (required, min 10 characters), optional screenshot.",
+          "Fields: Issue Summary (required), Details (required, min 10 characters), optional screenshot. The Help Center drawer uses a waving robot and a colored account icon, and stays readable in light and dark.",
           "Use for locked-out accounts, wrong email on file, missing access after invite, or profile issues.",
           "Submit with Submit Account Request.",
           "For permanent deletion, use Clerk Security → Delete account (intercepted by Flipvise confirmation).",
@@ -476,7 +478,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Fast-track email support for Pro Plus subscribers and team-tier plan owners.",
         howItWorks: [
-          "Appears as the first row on the Help Center landing screen when you have Pro Plus, an active team-tier subscription, or platform admin access.",
+          "Appears as the first row on the Help Center landing screen when you have Pro Plus, an active team-tier subscription, or platform admin access. That drawer uses a waving robot and a colored lightning icon, and stays readable in light and dark.",
           "Shows Pro Plus / Team badge, response-time targets, and benefits (senior engineers, screen-sharing, best-practice guidance).",
           "Send Email opens your mail client with a pre-filled Priority Support subject.",
           "Target response: within 4 business hours (Mon–Fri, 9am–5pm EST).",
@@ -582,7 +584,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Choose the right support channel: public live chat on Contact Us or categorized in-app tickets in Help Center.",
         howItWorks: [
           "Contact Us (/contact): public page, live chat thread, available to guests and signed-in users; best for general outreach or when not signed in.",
-          "Help Center (Documentation → Help Center section): categorized tickets (Support, Bug Report, Feature Request, Feedback, Billing, Account) with optional attachments.",
+          "Help Center (Documentation → Help Center section): categorized tickets (Support, Bug Report, Feature Request, Feedback, Billing, Account) with optional attachments. The drawer uses a waving robot and colored icons, and stays readable in light and dark.",
           "Help Center My tickets tracks formal ticket threads with resolve/reopen — separate from Contact Us live chat.",
           "Priority Support (Pro Plus / team tier) appears inside Help Center, not on Contact Us.",
           "Contact details (email, phone, WhatsApp number, social) on /contact are managed by platform administrators and apply to both channels.",
@@ -613,7 +615,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Compare tiers, choose monthly or yearly billing, and start checkout.",
         howItWorks: [
-          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck, Subscribe, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. The page footer shows the Flipvise Studio support email, phone, WhatsApp number, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
+          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck, Subscribe, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. That catalog is a solid illustrated window with a reading owl and colored guide icons. The page footer shows the Flipvise Studio support email, phone, WhatsApp number, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us. The pricing header shows books and an owl, purple plan buttons, and solid cards that stay readable in light and dark. The pricing documentation article is a solid illustrated panel with a reading owl.",
           "Toggle Billing period between monthly and yearly (yearly shows an effective monthly rate).",
           "Filter plans with the View plans dropdown, or show all tiers in the grid.",
           "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, and Enterprise.",
@@ -703,7 +705,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Confirm plan, billing period, promo, and amount due before Stripe payment.",
         howItWorks: [
-          "Open subscribe guide to walk through choosing a plan, Stripe checkout, Inbox confirmation, and the Flipvise receipt. The guide stays open while you browse. UI Guides in the header also lists Create a deck, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck.",
+          "Open subscribe guide to walk through choosing a plan, Stripe checkout, Inbox confirmation, and the Flipvise receipt. The guide stays open while you browse. UI Guides in the header also lists Create a deck, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. That catalog is a solid illustrated window with a reading owl and colored guide icons. The checkout documentation article is a solid illustrated panel with a reading owl.",
           "Review selected plan name, monthly vs yearly period, and list price.",
           "New subscribers: promo field applies here; discount shows on the payment step if valid.",
           "Existing subscribers upgrading/downgrading: see a proration preview instead of a fresh promo (promos are blocked on plan changes).",
@@ -735,7 +737,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Billing tab plan history receipt links open the Flipvise receipt (company street address from Contact Us). Receipts list the plan start, plan end, and auto-renewal On or Off. Trial receipts also list the trial length and end date.",
           "Opens Stripe Customer Portal in a new page — update card, download Stripe invoices, cancel at period end.",
           "Plan upgrades/downgrades can also start from /pricing (Change to …) which uses in-app proration checkout.",
-          "Billing tab shows plan history (past plan slugs and dates) synced from your account.",
+          "Billing tab shows plan history (past plan slugs and dates) synced from your account, in the illustrated billing layout that stays readable in light and dark.",
           "If a renewal payment fails, paid features remain for 12 hours while Stripe retries — update your card before grace ends.",
         ],
         requirements: ["Active or manageable Stripe subscription on your account."],
@@ -871,8 +873,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Manage name, email, password, connected accounts, and sessions.",
         howItWorks: [
-          "Click your avatar in the header to open Manage account. Dashboard links from the account menu do not put your Clerk user id in the address bar.",
-          "Profile: update display name and profile image.",
+          "Click the blue account button in the header to open Manage account. That window lists Account details, Profile, Security, Appearance, and Billing. Dashboard links from the account menu do not put your Clerk user id in the address bar.",
+          "Profile: update display name, and upload a photograph on the portrait beside your name. Clicking that photograph in the account menu opens a formal portrait dialog.",
           "Email addresses: add, verify, or set primary email.",
           "Security: change password, enable 2FA, review active sessions.",
           "Account details (custom tab): view phone, mailing address (state / province / parish; current details omit Parish from parish names), type/status, and masked Security Q&A; Edit requires login verification. Incomplete accounts finish those details on the account-information form, which stays readable in light and dark theme.",
@@ -890,7 +892,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "View and edit phone number, mailing address, type/status, and 3 security questions required for account verification.",
         howItWorks: [
-          "Open Manage account — Account details is the first tab (before Profile / Security).",
+          "Open Manage account from the blue header account button — Account details is the first tab (before Profile / Security), and the window is filled with that page rather than left blank. The account menu photograph opens a formal portrait dialog. The account menu and this tab use the illustrated cream and purple layout, with an owl on the details card, and stay readable in light and dark.",
           "Mailing address includes street, country, state / province / parish (current details and Jamaica parish names omit repeating Parish), city, and optional postal code.",
           "Click the masked Security Q&A — Clerk prompts you to verify your login; after success, all security questions and answers are shown.",
           "Click Edit details — Clerk prompts you to verify your login before the editable form unlocks; Save or Cancel when finished.",
@@ -909,11 +911,12 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         clerkTab: "appearance",
         purpose: "Theme mode, interface colors, illustrated deck design, and microphone settings.",
         howItWorks: [
-          "Choose light or dark base theme.",
+          "Choose light or dark base theme with the Light and Dark pills. Each pill plays a star-shaped theme change and shows small star sparkles. The Appearance tab uses the illustrated card layout and stays readable in both themes. Opening account from the header or the illustrated-design prompt lands on this filled Appearance page. The signed-in top bar keeps the same dark pill strip in both themes.",
           "Pro users pick interface background accent colors (8 on Pro, 12 on Pro Plus and above).",
           "Free users choose from 3 interface color presets.",
-          "Illustrated Deck Design is optional on every plan except Free. Free always uses the standard design. On other plans it turns on only when a platform admin has enabled it and you switch it on. Study content and plan features stay the same. If the admin switch is off, your saved choice is kept and the screen says illustrated designs are temporarily unavailable.",
+          "Illustrated Deck Design is included on every plan, including Free. It turns on when a platform admin has enabled it and you switch it on under Manage account, then Appearance. Study content and plan features stay the same. If the admin switch is off, your saved choice is kept and the screen says illustrated designs are temporarily unavailable. A short prompt after sign-in explains the benefits and where to find that switch when it is off.",
           "Reduce animations keeps illustrations while reducing movement. A device reduced-motion setting is respected even when this switch is off.",
+          "Change background artwork is a switch on this tab. When it is on, a slider sets how long the current scene stays, from 2 hours to 24 hours. That scene then changes on the page background, the dashboard, and study screens. Turning the switch off keeps the current scene.",
           "Microphone settings configure speech-to-text input for deck creation. Returning to Personal Dash uses /dashboard without a Clerk user id in the address bar.",
         ],
         requirements: [
@@ -932,7 +935,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "View current plan, Stripe portal access, cancellation, and plan history (plans and add-ons listed separately with their own receipts).",
         howItWorks: [
-          "Shows effective plan label and access subtitle. The plan name in the signed-in header also opens this tab.",
+          "Shows effective plan label and access subtitle in the illustrated billing layout, including the current-plan card and plan history table. The gold plan badge in the signed-in header opens this same filled Billing tab. The account menu photograph opens a formal portrait dialog. The tab stays readable in light and dark.",
           "Manage billing opens Stripe Customer Portal — update overseas billing address, card, download invoices.",
           "Cancel subscription: if you have active Stripe add-ons, choose add-on(s) only (default), plan (add-ons stop with the plan), or both — access continues until period end.",
           "Add-on-only cancel leaves your base plan renewing; an Inbox billing notice confirms that. Plan cancel shows Keep renewing plan if you need to reverse it.",
@@ -1176,7 +1179,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/onboarding/team",
         purpose: "Create your first team workspace after purchasing a team-tier plan.",
         howItWorks: [
-          "Wizard asks who the workspace is for (Corporation or Government, Education Institution, Teacher or Tutor, Parent or Guardian, Student or Study Group), then hides the other options. Use Change to pick a different option — detail fields stay hidden until you choose.",
+          "Wizard asks who the workspace is for (Corporation or Government, Education Institution, Teacher or Tutor, Parent or Guardian, Student or Study Group), with artwork beside each choice, then hides the other options. Use Change to pick a different option — detail fields stay hidden until you choose. The page uses a robot and solid cards that stay readable in light and dark. The Flipvise logo is not part of this screen.",
           "Corporation or Government: region, education level, school name, department/faculty, and class name.",
           "Education Institution: education level, school name, department/faculty, and class name.",
           "Teacher or Tutor: education level, school name, and class name.",
@@ -1184,7 +1187,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Student or Study Group: education level and class name.",
           "Flipvise suggests a unique workspace name from abbreviations of two or three fields (example: Caribbean + Kingston High School + Form 4B becomes Car-KHS-F4B). You can edit that name before creating. Duplicate auto-generated names get a suffix such as -2.",
           "Submit creates the workspace, shows a confirmation toast, then opens the personal dashboard.",
-          "Banner on personal dashboard links here if you have a team plan but no team yet.",
+          "Banner on personal dashboard links here if you have a team plan but no team yet. Manage workspaces uses the same create form in a dialog with illustrated choices, opened from a purple Add Workspace button with a plus icon, readable in light and dark.",
         ],
         requirements: ["Active team-tier subscription.", "No existing team yet."],
         doNots: ["Do not skip onboarding if you need team features — create the workspace first."],
@@ -1237,7 +1240,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Open from the header Teacher link when you have Education Plus or education team access. Open Teacher Dashboard guide for the Education Gold walkthrough: from Personal Dashboard choose Teacher Dash, then use the sidebar for the selected workspace. AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck both continue through Save Lesson Plan, the owner lesson-plan deck, and Saved Lesson Plans. AI Quiz/Test Generator from a lesson plan continues through member selection, a saved plan, passage settings, preview, and Workspace Decks. AI Quiz/Test Generator for an existing deck continues through Existing deck, the filled subject and grade, preview, and saving cards onto that deck. Homework Generator from a deck and Homework Generator from a lesson plan continue through Generate, preview, Save Homework, and Download PDF. Study Guide Generator from a lesson plan continues through a saved plan, optional reference material, All Days or one day, preview, Save, Download PDF, and Regenerate AI. Worksheet Generator from a lesson plan continues through a saved plan, All Days or one day, preview, Save, Worksheet PDF, and Answer Key PDF. Classes for the plan owner continues through Create class, the member and lesson-plan deck, the academic schedule (year, term, week, month, plan period, and periods), and the saved class row. Student Progress for the plan owner continues through AI Recall™ insights and a student’s saved session. Register a student for the plan owner continues through an existing class, an invited member, and the roster row. Student quiz results for the plan owner continues through Quiz results, the question sheet, the answer key, View quiz result, and Download PDF. Manual assignment grades for the plan owner continues through Add grade, the assignment score, the saved row, Generate report, and Download PDF. Quiz grades for the plan owner continues through Quiz result, a saved member result, Generate report, and the PDF. Teacher Resource Library for the plan owner continues through Saved Lesson Plans, Saved Homework, Saved Worksheets, and Saved Study Guides.",
           "Welcome card shows your plan badge (Education Plus, Education Gold, or Education Enterprise).",
-          "Sidebar groups tools: AI content tools, Add-ons, Classroom management, and Resources. Each tool uses a colored icon tile, and the open tool stays highlighted.",
+          "Sidebar groups tools: AI content tools, Add-ons, Classroom management, and Resources. Each tool uses a colored icon tile, and the open tool stays highlighted. The sidebar and dashboard shortcut pills are solid panels that stay readable in light and dark.",
           "Education Gold/Enterprise subscribers with team admin access see a Team Admin Dashboard shortcut. Owners do not see a Team Dashboard shortcut there — Personal Dashboard already lists their workspace decks.",
           "Workspace selector in the sidebar scopes tools to personal or team context when applicable.",
         ],
@@ -1262,7 +1265,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Open Worksheet Generator from a lesson plan guide to follow a saved plan, preview, Edit, Save, Worksheet PDF, and Answer Key PDF. Open Worksheet Generator, choose a saved lesson plan from the workspace owner or a team admin, then Generate. A multi-day plan asks which part to use: All Days or one day, listed by day only. The worksheet is then written with AI from that choice. Worksheet Generator (/teacher/worksheets) — printable practice sheets with answer keys.",
           "Generate AI Essay — premium add-on under the sidebar Add-ons category (AI Document Studio); requires the AI Essay add-on (purchase or complimentary grant). Workspace member assignment is coming soon.",
           "Each tool links one or more decks as source material — pick decks from your personal library or team workspaces you manage. Essay uses its own topic form in the AI Essay workspace.",
-          "Preview, edit, regenerate sections, and save outputs to your Teacher Resource Library. Daily Schedule days, vocabulary entries, class timelines, and the day-detail preview use raised color-accented panels so each day, term, and class phase stays visually separate while you edit.",
+          "Preview, edit, regenerate sections, and save outputs to your Teacher Resource Library. Daily Schedule days, vocabulary entries, class timelines, and the day-detail sheet use solid colored panels, section icons, and a reading owl so each day, term, and class phase stays readable in light and dark.",
         ],
         requirements: [
           "Education plan access.",

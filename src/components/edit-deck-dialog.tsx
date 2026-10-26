@@ -75,6 +75,10 @@ import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
+function displayDeckText(value: string | null | undefined): string {
+  return (value ?? "").replace(/\\/g, "");
+}
+
 function validateImageFile(file: File): string | null {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     return "Invalid file type. Only JPG, JPEG, PNG, WebP, and GIF images are allowed.";
@@ -125,10 +129,10 @@ export function EditDeckDialog({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : uncontrolledOpen;
-  const [name, setName] = useState(deck.name);
-  const [description, setDescription] = useState(deck.description ?? "");
-  const [gradeLevel, setGradeLevel] = useState(deck.gradeLevel ?? "");
-  const [difficultyLevel, setDifficultyLevel] = useState(deck.difficultyLevel ?? "");
+  const [name, setName] = useState(displayDeckText(deck.name));
+  const [description, setDescription] = useState(displayDeckText(deck.description));
+  const [gradeLevel, setGradeLevel] = useState(displayDeckText(deck.gradeLevel));
+  const [difficultyLevel, setDifficultyLevel] = useState(displayDeckText(deck.difficultyLevel));
   const [gradient, setGradient] = useState<GradientSlug>((deck.gradient as GradientSlug) ?? "none");
   const [coverUrl, setCoverUrl] = useState(deck.coverImageUrl ?? null);
   const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
@@ -183,10 +187,10 @@ export function EditDeckDialog({
       descriptionSpeech.stop();
       nameSpeech.clearError();
       descriptionSpeech.clearError();
-      setName(deck.name);
-      setDescription(deck.description ?? "");
-      setGradeLevel(deck.gradeLevel ?? "");
-      setDifficultyLevel(deck.difficultyLevel ?? "");
+      setName(displayDeckText(deck.name));
+      setDescription(displayDeckText(deck.description));
+      setGradeLevel(displayDeckText(deck.gradeLevel));
+      setDifficultyLevel(displayDeckText(deck.difficultyLevel));
       setGradient((deck.gradient as GradientSlug) ?? "none");
       setCoverUploadError(null);
       setFirstCardFrontError(null);
@@ -376,13 +380,20 @@ export function EditDeckDialog({
           {triggerLabel}
         </DialogTrigger>
       ) : null}
-      <DialogContent className="w-[calc(100vw-1.25rem)] max-w-md max-h-[min(92dvh,40rem)] overflow-y-auto overflow-x-hidden p-4 sm:p-6 sm:mx-auto sm:w-full">
-        <DialogHeader className="text-left sm:text-left">
+      <DialogContent className="edit-deck-dialog deck-form-dialog w-[calc(100vw-1.25rem)] max-w-2xl max-h-[min(92dvh,44rem)] overflow-y-auto overflow-x-hidden p-4 sm:p-6 sm:mx-auto sm:w-full">
+        <DialogHeader className="deck-form-header text-left sm:text-left">
+          <Image
+            src="/artwork/home/edit-deck-owl.png"
+            alt=""
+            width={200}
+            height={200}
+            className="deck-form-owl"
+          />
           <DialogTitle className="text-base leading-snug sm:text-lg sm:text-xl">
             Edit deck
           </DialogTitle>
           <DialogDescription className="text-xs leading-relaxed sm:text-sm">
-          Update the name/subject/course, description/topic, grade level, difficulty, and
+          Update the name, subject, course, description, topic, grade level, difficulty, and
             optional cover image for this deck.
             {showTeamDeckCover
               ? " The cover appears on dashboard deck cards and is not counted as a flashcard."
@@ -396,7 +407,7 @@ export function EditDeckDialog({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Label htmlFor="deck-name" className="text-xs sm:text-sm">
-                  Name/Subject/Course
+                  Name, subject, or course
                 </Label>
                 <Tooltip>
                   <TooltipTrigger
@@ -448,7 +459,7 @@ export function EditDeckDialog({
               id="deck-name"
               placeholder="e.g. Jamaican History"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setName(displayDeckText(e.target.value))}
               disabled={isPending}
               className="text-sm"
             />
@@ -457,7 +468,7 @@ export function EditDeckDialog({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Label htmlFor="deck-description" className="text-xs sm:text-sm">
-                  Description/Topic
+                  Description or topic
                 </Label>
                 <Tooltip>
                   <TooltipTrigger
@@ -511,7 +522,7 @@ export function EditDeckDialog({
               id="deck-description"
               placeholder="e.g. Learning Jamaica's independence and national identity"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => setDescription(displayDeckText(e.target.value))}
               rows={3}
               disabled={isPending}
               className="text-sm"
@@ -546,7 +557,7 @@ export function EditDeckDialog({
                 id="deck-grade-level"
                 placeholder="e.g. Grade 6"
                 value={gradeLevel}
-                onChange={(e) => setGradeLevel(e.target.value)}
+                onChange={(e) => setGradeLevel(displayDeckText(e.target.value))}
                 disabled={isPending}
                 className="text-sm"
               />
@@ -735,21 +746,21 @@ export function EditDeckDialog({
         </div>
         </TooltipProvider>
 
-        <DialogFooter className="mt-1 gap-2 sm:mt-2 sm:gap-0">
+        <DialogFooter className="deck-form-footer mt-1 gap-2 sm:mt-2 sm:gap-2">
           <Button
             variant="outline"
             onClick={() => handleOpenChange(false)}
             disabled={isPending}
-            className="h-10 w-full sm:h-8 sm:w-auto"
+            className="deck-form-cancel h-10 w-full sm:h-10 sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isPending || !name.trim()}
-            className="h-10 w-full sm:h-8 sm:w-auto"
+            className="deck-form-submit h-10 w-full sm:h-10 sm:w-auto"
           >
-            {isPending ? "Saving…" : "Save changes"}
+            {isPending ? "Saving…" : "Save Changes"}
           </Button>
         </DialogFooter>
       </DialogContent>

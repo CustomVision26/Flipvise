@@ -56,6 +56,18 @@ async function main() {
     VALUES (1, false)
     ON CONFLICT ("id") DO NOTHING
   `;
+  await sql`
+    ALTER TABLE "user_appearance_preferences"
+      ADD COLUMN IF NOT EXISTS "backgroundChangeEnabled" boolean DEFAULT true NOT NULL
+  `;
+  await sql`
+    ALTER TABLE "user_appearance_preferences"
+      ADD COLUMN IF NOT EXISTS "backgroundChangeHours" integer DEFAULT 24 NOT NULL
+  `;
+  await sql`
+    ALTER TABLE "user_appearance_preferences"
+      ADD COLUMN IF NOT EXISTS "backgroundRotationStartedAt" timestamp DEFAULT now() NOT NULL
+  `;
   console.log("Illustrated appearance tables are present.");
 }
 

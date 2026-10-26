@@ -4,19 +4,28 @@ import * as React from "react";
 import Image from "next/image";
 import {
   BookOpen,
+  Bot,
   Building2,
   ChevronLeft,
   ChevronRight,
+  Coins,
+  CreditCard,
   Expand,
   Eye,
   GraduationCap,
   Images,
   Layers,
+  LayoutGrid,
+  Link2,
+  ListChecks,
+  Lock,
   Maximize2,
   Minimize2,
   MousePointerClick,
+  PencilLine,
   Shrink,
   Sparkles,
+  UserPlus,
   X,
 } from "lucide-react";
 import {
@@ -421,7 +430,7 @@ export function HomepageScreenshotViewButton({
         <Eye className="size-3.5" aria-hidden />
         View
       </DialogTrigger>
-      <DialogContent className="max-w-[min(72rem,calc(100%-1.5rem))] p-0 sm:max-w-[min(72rem,calc(100%-2rem))]">
+      <DialogContent className="docs-shot-dialog max-w-[min(72rem,calc(100%-1.5rem))] p-0 sm:max-w-[min(72rem,calc(100%-2rem))]">
         <DialogHeader className="px-4 pt-4 pr-12 sm:px-5 sm:pt-5">
           <DialogTitle>{HOMEPAGE_SCREENSHOT.title}</DialogTitle>
           <DialogDescription>
@@ -453,6 +462,24 @@ const CATEGORY_ICONS: Record<
   "getting-started": BookOpen,
   "decks-and-cards": Layers,
   "team-tier": Building2,
+};
+
+const GUIDE_TILE_ICONS: Partial<
+  Record<
+    DocsUiGuideId,
+    React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>
+  >
+> = {
+  signup: UserPlus,
+  signin: Lock,
+  "personal-dashboard": LayoutGrid,
+  pricing: Coins,
+  subscribe: CreditCard,
+  "create-deck": Layers,
+  "ai-created-cards": Bot,
+  "manual-added-cards": PencilLine,
+  "manual-add-mcq": ListChecks,
+  "add-card-from-source": Link2,
 };
 
 type CatalogAccent = {
@@ -538,12 +565,13 @@ function DocsUiGuideCatalogItem({
 }) {
   const item = DOCS_UI_GUIDES[id];
   if (!item) return null;
+  const TileIcon = GUIDE_TILE_ICONS[id] ?? BookOpen;
   return (
     <Button
       type="button"
       variant="outline"
       className={cn(
-        "relative h-auto min-h-[6.75rem] w-full items-start justify-start overflow-hidden rounded-xl bg-card/80 px-4 py-4 text-left whitespace-normal shadow-none",
+        "ui-guide-card relative h-auto min-h-[6.75rem] w-full items-start justify-start gap-3 overflow-hidden rounded-xl px-4 py-4 text-left whitespace-normal shadow-none",
         accent.itemBorder,
         "transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg",
         accent.hover,
@@ -566,6 +594,9 @@ function DocsUiGuideCatalogItem({
           accent.blob,
         )}
       />
+      <span className="ui-guide-tile" aria-hidden>
+        <TileIcon className="size-6" />
+      </span>
       <span className="relative flex min-w-0 flex-1 flex-col gap-2">
         <span className="flex items-start justify-between gap-3">
           <span className="font-heading text-sm font-semibold leading-snug text-foreground sm:text-base">
@@ -615,8 +646,8 @@ export function DocsUiGuidesMenuButton({
       </DialogTrigger>
       <DialogContent
         className={cn(
-          "flex max-h-[min(96vh,68rem)] w-full max-w-[calc(100%-0.75rem)] flex-col gap-0 overflow-hidden p-0 text-base",
-          "border-0 bg-popover/95 shadow-2xl shadow-cyan-500/20 ring-1 ring-cyan-400/40 backdrop-blur-md",
+          "ui-guides-dialog flex max-h-[min(96vh,68rem)] w-full max-w-[calc(100%-0.75rem)] flex-col gap-0 overflow-hidden p-0 text-base",
+          "border-0 shadow-2xl",
           "duration-500 data-open:slide-in-from-bottom-4 data-open:zoom-in-95 data-closed:slide-out-to-bottom-4",
           "sm:max-w-[min(92rem,calc(100%-2rem))]",
         )}
@@ -649,8 +680,15 @@ export function DocsUiGuidesMenuButton({
                   aria-hidden
                   className="absolute inset-0 animate-ping rounded-xl bg-cyan-400/25"
                 />
-                <Images className="relative size-7" aria-hidden />
+                <BookOpen className="relative size-7" aria-hidden />
               </span>
+              <Image
+                src="/artwork/home/guides-catalog-owl.png"
+                alt=""
+                width={220}
+                height={220}
+                className="ui-guides-owl"
+              />
               <div className="min-w-0 flex-1 space-y-2">
                 <Badge
                   variant="outline"

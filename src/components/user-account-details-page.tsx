@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useReverification, useUser } from "@clerk/nextjs";
 import { isReverificationCancelledError } from "@clerk/nextjs/errors";
 import { Loader2, Pencil, ShieldAlert } from "lucide-react";
+import Image from "next/image";
 import { toast } from "sonner";
 import { unlockAccountDetailsEditAction } from "@/actions/account-details-edit";
 import {
@@ -322,9 +323,16 @@ export function UserAccountDetailsPage() {
     );
 
   return (
-    <div className="space-y-4 px-1 pb-4">
-      <Card size="sm" className="border-border/70 shadow-none">
-        <CardHeader className="space-y-1.5 border-b border-border/60 pb-4">
+    <div className="account-clerk-page space-y-4 px-1 pb-4">
+      <Card size="sm" className="account-clerk-card border-border/70 shadow-none">
+        <CardHeader className="account-clerk-header space-y-1.5 border-b border-border/60 pb-4">
+          <Image
+            src="/artwork/home/account-details-owl.png"
+            alt=""
+            width={180}
+            height={180}
+            className="account-clerk-owl"
+          />
           <CardTitle className="text-base font-semibold tracking-tight">
             Contact &amp; verification details
           </CardTitle>
@@ -400,7 +408,7 @@ export function UserAccountDetailsPage() {
                   variant="outline"
                   onClick={() => void startEditing()}
                   disabled={unlockingEdit || revealingSecurityQa}
-                  className="h-9"
+                  className="account-clerk-pill h-9"
                 >
                   {unlockingEdit ? (
                     <>

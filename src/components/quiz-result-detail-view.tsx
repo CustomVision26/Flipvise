@@ -183,7 +183,7 @@ function QuizResultScoreCard({ result }: { result: QuizResultSummary }) {
   return (
     <div
       className={cn(
-        "rounded-xl border bg-gradient-to-br p-4 ring-1 sm:p-5",
+        "quiz-result-score rounded-xl border p-4 ring-1 sm:p-5",
         tier.surface,
         tier.ring,
         "border-border/70",
@@ -388,7 +388,7 @@ function QuizResultPerCardReview({
   ];
 
   return (
-    <div className={cn("space-y-4", expanded && "space-y-5")}>
+    <div className={cn("quiz-result-review space-y-4", expanded && "space-y-5")}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1.5">
           {filterOptions.map((option) => (
@@ -430,14 +430,7 @@ function QuizResultPerCardReview({
             return (
               <li
                 key={card.cardId}
-                className={cn(
-                  "overflow-hidden rounded-xl border",
-                  status === "correct"
-                    ? "border-emerald-500/30 bg-emerald-500/5"
-                    : status === "incorrect"
-                      ? "border-rose-500/30 bg-rose-500/5"
-                      : "border-border bg-muted/15",
-                )}
+                className="quiz-result-review-card overflow-hidden rounded-xl border"
               >
                 <button
                   type="button"
@@ -921,10 +914,10 @@ export function QuizResultDetailView({ result, variant, onClose }: QuizResultDet
 
   const containerClass =
     variant === "embedded"
-      ? "flex w-full flex-col"
+      ? "quiz-result-sheet flex w-full flex-col"
       : variant === "page"
-        ? "mx-auto flex min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card max-h-[min(92vh,calc(100dvh-6rem))]"
-        : "flex min-h-0 flex-1 flex-col overflow-hidden";
+        ? "quiz-result-sheet mx-auto flex min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-xl border max-h-[min(92vh,calc(100dvh-6rem))]"
+        : "quiz-result-sheet flex min-h-0 flex-1 flex-col overflow-hidden";
 
   const scrollClass =
     variant === "dialog"

@@ -10,6 +10,7 @@ import {
   APPEARANCE_POLL_MS,
   appearanceAfterReadFailure,
   appearanceCacheKey,
+  clampBackgroundChangeHours,
   resolveEffectiveIllustratedDesign,
   resolveEffectiveReducedMotion,
   shouldApplyAppearanceSnapshot,
@@ -22,6 +23,9 @@ type AppearanceContextValue = {
   planAllowsIllustrated: boolean;
   effectiveIllustratedDesign: boolean;
   userReduceAnimations: boolean;
+  backgroundChangeEnabled: boolean;
+  backgroundChangeHours: number;
+  backgroundRotationStartedAt: string | null;
   systemPrefersReducedMotion: boolean;
   effectiveReducedMotion: boolean;
   loading: boolean;
@@ -32,6 +36,8 @@ type AppearanceContextValue = {
   updatePreferences: (patch: {
     illustratedDesignPreferred?: boolean;
     reduceAnimations?: boolean;
+    backgroundChangeEnabled?: boolean;
+    backgroundChangeHours?: number;
   }) => Promise<void>;
 };
 
@@ -50,6 +56,12 @@ function readCachedSnapshot(userId: string | null): PublicAppearanceSnapshot | n
       userPreferred: parsed.userPreferred === true,
       userReduceAnimations: parsed.userReduceAnimations === true,
       planAllowsIllustrated: parsed.planAllowsIllustrated === true,
+      backgroundChangeEnabled: parsed.backgroundChangeEnabled !== false,
+      backgroundChangeHours: clampBackgroundChangeHours(parsed.backgroundChangeHours),
+      backgroundRotationStartedAt:
+        typeof parsed.backgroundRotationStartedAt === "string"
+          ? parsed.backgroundRotationStartedAt
+          : null,
     };
   } catch {
     return null;
@@ -139,6 +151,9 @@ export function IllustratedAppearanceProvider({
     initial.userPreferred,
     initial.userReduceAnimations,
     initial.planAllowsIllustrated,
+    initial.backgroundChangeEnabled,
+    initial.backgroundChangeHours,
+    initial.backgroundRotationStartedAt,
   ]);
 
   React.useEffect(() => {
@@ -203,6 +218,8 @@ export function IllustratedAppearanceProvider({
     async (patch: {
       illustratedDesignPreferred?: boolean;
       reduceAnimations?: boolean;
+      backgroundChangeEnabled?: boolean;
+      backgroundChangeHours?: number;
     }) => {
       if (saving) return;
       const previous = snapshotRef.current;
@@ -212,12 +229,23 @@ export function IllustratedAppearanceProvider({
       }
       setSaving(true);
       setError(null);
+      const resetsClock =
+        patch.backgroundChangeEnabled !== undefined ||
+        patch.backgroundChangeHours !== undefined;
       const optimistic: PublicAppearanceSnapshot = {
         ...previous,
         userPreferred:
           patch.illustratedDesignPreferred ?? previous.userPreferred,
         userReduceAnimations:
           patch.reduceAnimations ?? previous.userReduceAnimations,
+        backgroundChangeEnabled:
+          patch.backgroundChangeEnabled ?? previous.backgroundChangeEnabled,
+        backgroundChangeHours: clampBackgroundChangeHours(
+          patch.backgroundChangeHours ?? previous.backgroundChangeHours,
+        ),
+        backgroundRotationStartedAt: resetsClock
+          ? new Date().toISOString()
+          : previous.backgroundRotationStartedAt,
       };
       setSnapshot(optimistic);
       try {
@@ -266,6 +294,9 @@ export function IllustratedAppearanceProvider({
       planAllowsIllustrated: snapshot.planAllowsIllustrated,
       effectiveIllustratedDesign,
       userReduceAnimations: snapshot.userReduceAnimations,
+      backgroundChangeEnabled: snapshot.backgroundChangeEnabled,
+      backgroundChangeHours: snapshot.backgroundChangeHours,
+      backgroundRotationStartedAt: snapshot.backgroundRotationStartedAt,
       systemPrefersReducedMotion,
       effectiveReducedMotion,
       loading: false,
@@ -301,6 +332,9 @@ export function useIllustratedAppearance(): AppearanceContextValue {
     planAllowsIllustrated: false,
     effectiveIllustratedDesign: false,
     userReduceAnimations: false,
+    backgroundChangeEnabled: true,
+    backgroundChangeHours: 24,
+    backgroundRotationStartedAt: null,
     systemPrefersReducedMotion: false,
     effectiveReducedMotion: false,
     loading: false,

@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 import {
   appearanceAfterGlobalChange,
   appearanceAfterReadFailure,
+  backgroundSceneStep,
   canUpdateGlobalAppearance,
   canUpdateUserAppearance,
+  clampBackgroundChangeHours,
   coalesceGlobalAppearance,
   coalesceUserAppearance,
+  nextBackgroundSubject,
   planAllowsIllustratedDesign,
   resolveEffectiveIllustratedDesign,
   resolveEffectiveReducedMotion,
@@ -16,7 +19,7 @@ import {
 } from "./illustrated-appearance";
 
 describe("resolveEffectiveIllustratedDesign", () => {
-  it("is on only when the global switch, the user preference, and a non-free plan are all on", () => {
+  it("is on only when the global switch, the user preference, and plan access are all on", () => {
     assert.equal(resolveEffectiveIllustratedDesign(true, true, true), true);
     assert.equal(resolveEffectiveIllustratedDesign(true, false, true), false);
     assert.equal(resolveEffectiveIllustratedDesign(false, true, true), false);
@@ -26,11 +29,11 @@ describe("resolveEffectiveIllustratedDesign", () => {
 });
 
 describe("planAllowsIllustratedDesign", () => {
-  it("allows every plan except Free", () => {
-    assert.equal(planAllowsIllustratedDesign("free"), false);
-    assert.equal(planAllowsIllustratedDesign(" Free "), false);
-    assert.equal(planAllowsIllustratedDesign(null), false);
-    assert.equal(planAllowsIllustratedDesign(""), false);
+  it("allows every plan, including Free", () => {
+    assert.equal(planAllowsIllustratedDesign("free"), true);
+    assert.equal(planAllowsIllustratedDesign(" Free "), true);
+    assert.equal(planAllowsIllustratedDesign(null), true);
+    assert.equal(planAllowsIllustratedDesign(""), true);
     assert.equal(planAllowsIllustratedDesign("pro"), true);
     assert.equal(planAllowsIllustratedDesign("pro_plus"), true);
     assert.equal(planAllowsIllustratedDesign("pro_plus_team_gold"), true);
@@ -42,6 +45,9 @@ describe("missing settings and read failures", () => {
     assert.deepEqual(coalesceUserAppearance(null), {
       illustratedDesignPreferred: false,
       reduceAnimations: false,
+      backgroundChangeEnabled: true,
+      backgroundChangeHours: 24,
+      backgroundRotationStartedAt: null,
     });
     assert.equal(coalesceGlobalAppearance(undefined), false);
   });
@@ -53,6 +59,9 @@ describe("missing settings and read failures", () => {
       userPreferred: true,
       userReduceAnimations: false,
       planAllowsIllustrated: true,
+      backgroundChangeEnabled: true,
+      backgroundChangeHours: 24,
+      backgroundRotationStartedAt: null,
     };
     assert.equal(appearanceAfterReadFailure(previous, "user_a"), previous);
   });
@@ -70,6 +79,9 @@ describe("missing settings and read failures", () => {
           userPreferred: true,
           userReduceAnimations: true,
           planAllowsIllustrated: true,
+          backgroundChangeEnabled: true,
+          backgroundChangeHours: 24,
+          backgroundRotationStartedAt: null,
         },
         "user_b",
       ),
@@ -178,5 +190,85 @@ describe("resolveSubjectArtwork", () => {
     });
     assert.equal(resolved.subject, "geography");
     assert.equal(resolved.coverImageUrl, null);
+  });
+});
+
+describe("background artwork schedule", () => {
+  const hour = 60 * 60 * 1000;
+
+  it("keeps the hour choice between 2 and 24", () => {
+    assert.equal(clampBackgroundChangeHours(1), 2);
+    assert.equal(clampBackgroundChangeHours(2), 2);
+    assert.equal(clampBackgroundChangeHours(2.6), 3);
+    assert.equal(clampBackgroundChangeHours(24), 24);
+    assert.equal(clampBackgroundChangeHours(30), 24);
+    assert.equal(clampBackgroundChangeHours(Number.NaN), 24);
+  });
+
+  it("holds the current scene until the chosen hours have passed", () => {
+    const startedAtMs = 1_000;
+    assert.equal(
+      backgroundSceneStep({
+        nowMs: startedAtMs + 2 * hour - 1,
+        startedAtMs,
+        hours: 2,
+        enabled: true,
+      }),
+      0,
+    );
+    assert.equal(
+      backgroundSceneStep({
+        nowMs: startedAtMs + 2 * hour,
+        startedAtMs,
+        hours: 2,
+        enabled: true,
+      }),
+      1,
+    );
+    assert.equal(
+      backgroundSceneStep({
+        nowMs: startedAtMs + 16 * hour,
+        startedAtMs,
+        hours: 2,
+        enabled: true,
+      }),
+      1,
+    );
+    assert.equal(
+      backgroundSceneStep({
+        nowMs: startedAtMs + 24 * hour,
+        startedAtMs,
+        hours: 24,
+        enabled: true,
+      }),
+      1,
+    );
+  });
+
+  it("stays on the current scene when the schedule is off or has not started", () => {
+    assert.equal(
+      backgroundSceneStep({
+        nowMs: 100 * hour,
+        startedAtMs: 0,
+        hours: 2,
+        enabled: false,
+      }),
+      0,
+    );
+    assert.equal(
+      backgroundSceneStep({
+        nowMs: 100 * hour,
+        startedAtMs: null,
+        hours: 2,
+        enabled: true,
+      }),
+      0,
+    );
+  });
+
+  it("walks subjects in order and wraps after technology", () => {
+    assert.equal(nextBackgroundSubject("general", 0), "general");
+    assert.equal(nextBackgroundSubject("general", 1), "mathematics");
+    assert.equal(nextBackgroundSubject("technology", 1), "general");
   });
 });

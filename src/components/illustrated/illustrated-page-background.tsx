@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import {
+  useBackgroundRotationNow,
+  useEffectiveRotationStart,
+} from "@/components/illustrated/use-background-rotation";
+import { backgroundSceneStep } from "@/lib/illustrated-appearance";
+import {
   resolveIllustratedPageTheme,
+  rotateIllustratedPageTheme,
   type IllustratedPageTheme,
 } from "@/lib/illustrated-page-theme";
 
@@ -22,13 +28,34 @@ export function IllustratedPageBackground({
   /** Already resolved by the deck layout. Skips a second lookup. */
   theme?: IllustratedPageTheme;
 }) {
-  const { effectiveIllustratedDesign } = useIllustratedAppearance();
-  const [failed, setFailed] = useState<{ left?: boolean; right?: boolean }>({});
-  if (!effectiveIllustratedDesign) return null;
-
-  const theme =
+  const appearance = useIllustratedAppearance();
+  const rotating = appearance.effectiveIllustratedDesign && appearance.backgroundChangeEnabled;
+  const startedAt = useEffectiveRotationStart(
+    appearance.backgroundRotationStartedAt,
+    rotating,
+  );
+  const now = useBackgroundRotationNow(
+    rotating,
+    appearance.backgroundChangeHours,
+    startedAt,
+  );
+  const base =
     themeProp ??
     resolveIllustratedPageTheme({ name, description, gradeLevel, subject });
+  const theme = rotateIllustratedPageTheme(
+    base,
+    backgroundSceneStep({
+      nowMs: now,
+      startedAtMs: startedAt ? Date.parse(startedAt) : null,
+      hours: appearance.backgroundChangeHours,
+      enabled: rotating,
+    }),
+  );
+  const [failed, setFailed] = useState<{ left?: boolean; right?: boolean }>({});
+  useEffect(() => {
+    setFailed({});
+  }, [theme.left, theme.right]);
+  if (!appearance.effectiveIllustratedDesign) return null;
   const showLeft = Boolean(theme.left) && !failed.left;
   const showRight = Boolean(theme.right) && !failed.right;
 

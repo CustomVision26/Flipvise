@@ -53,7 +53,7 @@ export function AdminAppearanceControl({
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-foreground">Illustrated Appearance</h2>
         <p className="text-sm text-muted-foreground">
-          Allow users to enable illustrated decks and study screens. Turning this off displays the
+          Allow users on every plan, including Free, to enable illustrated decks, backgrounds, and study screens. Turning this off displays the
           standard design for everyone.
         </p>
         <p className="text-sm text-muted-foreground">

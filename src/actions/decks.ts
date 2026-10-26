@@ -22,6 +22,11 @@ import { userHasTeacherToolsAccess } from "@/lib/teacher-access";
 import { buildTeacherLessonBuilderPath } from "@/lib/teacher-url";
 import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
 
+function withoutStrayBackslashes(value: string | undefined): string | undefined {
+  if (value == null) return value;
+  return value.replace(/\\/g, "");
+}
+
 const createDeckSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
@@ -76,16 +81,19 @@ export async function createDeckAction(
     }
 
     const sessionUserId = userId;
+    const name = withoutStrayBackslashes(parsed.data.name)?.trim() ?? "";
+    const description = withoutStrayBackslashes(parsed.data.description);
+    const gradeLevel = withoutStrayBackslashes(parsed.data.gradeLevel);
+    const difficultyLevel = withoutStrayBackslashes(parsed.data.difficultyLevel);
     const {
-      name,
-      description,
-      gradeLevel,
-      difficultyLevel,
       gradient,
       teamId,
       personalOnly,
       teamWorkspaceOnly,
     } = parsed.data;
+    if (!name) {
+      return { ok: false, error: "Name is required" };
+    }
 
     async function insertPersonalDeckForSessionUser(): Promise<
       CreateDeckActionResult
@@ -192,14 +200,17 @@ export async function updateDeckAction(data: UpdateDeckInput) {
     throw new Error("Forbidden");
   }
 
+  const name = withoutStrayBackslashes(parsed.data.name)?.trim() ?? "";
+  if (!name) throw new Error("Invalid input");
+
   await updateDeck(
     parsed.data.deckId,
     bundle.deck.userId,
-    parsed.data.name,
-    parsed.data.description,
+    name,
+    withoutStrayBackslashes(parsed.data.description),
     parsed.data.gradient,
-    parsed.data.gradeLevel,
-    parsed.data.difficultyLevel,
+    withoutStrayBackslashes(parsed.data.gradeLevel),
+    withoutStrayBackslashes(parsed.data.difficultyLevel),
   );
 
   revalidatePath(`/decks/${parsed.data.deckId}`);

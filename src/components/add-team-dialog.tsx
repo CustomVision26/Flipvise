@@ -3,6 +3,8 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import { Plus } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Tooltip,
@@ -116,6 +118,7 @@ export function AddTeamDialog({
               {...props}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
+                "manage-workspaces-limit",
                 props.className,
               )}
             >
@@ -144,12 +147,12 @@ export function AddTeamDialog({
                   {...props}
                   render={
                     <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(props.className)}
+                      variant="default"
+                      className={cn("manage-workspaces-add gap-1.5", props.className)}
                     />
                   }
                 >
+                  <Plus className="size-4" aria-hidden />
                   {triggerLabel}
                 </DialogTrigger>
               )}
@@ -160,14 +163,24 @@ export function AddTeamDialog({
           </Tooltip>
         </TooltipProvider>
       ) : (
-        <DialogTrigger render={<Button variant="outline" size="sm" />}>
+        <DialogTrigger
+          render={<Button variant="default" className="manage-workspaces-add gap-1.5" />}
+        >
+          <Plus className="size-4" aria-hidden />
           {triggerLabel}
         </DialogTrigger>
       )}
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-lg mx-4 sm:mx-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl">Create a team</DialogTitle>
-          <DialogDescription className="text-sm">
+      <DialogContent className="create-team-dialog w-[calc(100vw-2rem)] max-w-xl overflow-visible shadow-none ring-0 sm:max-w-xl">
+        <Image
+          src="/artwork/home/team-robot.png"
+          alt=""
+          width={220}
+          height={220}
+          className="create-team-robot"
+        />
+        <DialogHeader className="create-team-header">
+          <DialogTitle>Create a team</DialogTitle>
+          <DialogDescription>
             Choose who this workspace is for. Flipvise suggests a unique name from
             your details — you can edit it before creating. You can invite members
             after it is created.
@@ -194,12 +207,16 @@ export function AddTeamDialog({
         </form>
 
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" type="button" />} disabled={isPending}>
+          <DialogClose
+            render={<Button variant="outline" type="button" className="create-team-cancel" />}
+            disabled={isPending}
+          >
             Cancel
           </DialogClose>
           <Button
             type="submit"
             form="add-team-form"
+            className="create-team-submit"
             disabled={isPending || !canSubmit}
           >
             {isPending ? "Creating…" : "Create team"}

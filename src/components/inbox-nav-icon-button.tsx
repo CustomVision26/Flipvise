@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Inbox } from "lucide-react";
+import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HeaderNavTooltip } from "@/components/header-nav-tooltip";
 
@@ -38,7 +38,7 @@ export function InboxNavIconButton({
         className="relative h-8 w-8 rounded-full"
         aria-label={label}
       >
-        <Inbox className="size-[18px]" aria-hidden />
+        <Bell className="size-[18px]" aria-hidden />
         {clampedCount > 0 && (
           <span
             aria-hidden

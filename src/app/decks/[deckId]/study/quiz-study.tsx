@@ -2231,12 +2231,12 @@ function QuizResultCard({
   const Icon = style.Icon;
   return (
     <div
-      className="flex flex-1 flex-col items-center gap-6 px-2 sm:px-4 py-2 sm:py-4 w-full min-w-0"
+      className="quiz-result-screen flex flex-1 flex-col items-center gap-6 px-2 sm:px-4 py-2 sm:py-4 w-full min-w-0"
       style={resultAccentCss}
     >
       <IllustratedPeekFrame seed={`${deckName}-quiz-result`} className="w-full max-w-xl">
       <div
-        className={`border-beam-pair relative w-full flex flex-col items-center gap-4 sm:gap-6 overflow-hidden rounded-xl sm:rounded-2xl border bg-gradient-to-b ${style.accent} bg-card p-6 sm:p-10 shadow-md text-center`}
+        className="quiz-result-card border-beam-pair relative w-full flex flex-col items-center gap-4 sm:gap-6 overflow-hidden rounded-xl sm:rounded-2xl border p-6 sm:p-10 text-center"
       >
         <div className="flex flex-col items-center gap-2">
           <Icon className={`h-10 w-10 sm:h-12 sm:w-12 ${style.color}`} />
@@ -2265,20 +2265,20 @@ function QuizResultCard({
         </div>
 
         <div className="w-full grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="flex flex-col items-center gap-1 rounded-xl border bg-emerald-500/10 border-emerald-500/20 py-3">
-            <CheckCircle className="h-5 w-5 text-emerald-500" />
-            <span className="text-lg sm:text-xl font-bold text-emerald-500">{correct}</span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground">Correct</span>
+          <div className="quiz-result-stat quiz-result-stat-correct flex flex-col items-center gap-1 rounded-xl border py-3">
+            <CheckCircle className="h-5 w-5" />
+            <span className="text-lg sm:text-xl font-bold">{correct}</span>
+            <span className="text-[10px] sm:text-xs">Correct</span>
           </div>
-          <div className="flex flex-col items-center gap-1 rounded-xl border bg-rose-500/10 border-rose-500/20 py-3">
-            <XCircle className="h-5 w-5 text-rose-500" />
-            <span className="text-lg sm:text-xl font-bold text-rose-500">{incorrect}</span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground">Incorrect</span>
+          <div className="quiz-result-stat quiz-result-stat-incorrect flex flex-col items-center gap-1 rounded-xl border py-3">
+            <XCircle className="h-5 w-5" />
+            <span className="text-lg sm:text-xl font-bold">{incorrect}</span>
+            <span className="text-[10px] sm:text-xs">Incorrect</span>
           </div>
-          <div className="flex flex-col items-center gap-1 rounded-xl border bg-muted/30 border-border py-3">
-            <CircleHelp className="h-5 w-5 text-muted-foreground" />
-            <span className="text-lg sm:text-xl font-bold text-foreground">{unanswered}</span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground">Unanswered</span>
+          <div className="quiz-result-stat quiz-result-stat-open flex flex-col items-center gap-1 rounded-xl border py-3">
+            <CircleHelp className="h-5 w-5" />
+            <span className="text-lg sm:text-xl font-bold">{unanswered}</span>
+            <span className="text-[10px] sm:text-xs">Unanswered</span>
           </div>
         </div>
 
@@ -2286,7 +2286,7 @@ function QuizResultCard({
           {total} question{total !== 1 ? "s" : ""} · finished in {formatClock(elapsedSeconds)}
         </p>
 
-        <figure className="w-full rounded-xl border bg-background/50 p-4 text-left">
+        <figure className="quiz-result-quote w-full rounded-xl border p-4 text-left">
           <blockquote className={`text-sm sm:text-base italic leading-relaxed ${style.color}`}>
             “{quote.text}”
           </blockquote>
@@ -2328,7 +2328,7 @@ function QuizResultCard({
                   <Button
                     size="default"
                     variant="secondary"
-                    className="w-full gap-2 h-10 sm:h-11"
+                    className="quiz-result-save w-full gap-2 h-10 sm:h-11"
                     onClick={() => setSaveDialogOpen(true)}
                     disabled={saving}
                   >
@@ -2356,11 +2356,7 @@ function QuizResultCard({
                   render={
                     <Button
                       size="default"
-                      className={cn(
-                        "w-full gap-2 h-10 sm:h-11",
-                        resultAccent.hasDeckAccent &&
-                          "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
-                      )}
+                      className="quiz-result-retake w-full gap-2 h-10 sm:h-11"
                       onClick={onRetake}
                     />
                   }
@@ -2379,7 +2375,7 @@ function QuizResultCard({
                   <Button
                     variant="outline"
                     size="default"
-                    className="w-full gap-2 h-10 sm:h-11"
+                    className="quiz-result-back w-full gap-2 h-10 sm:h-11"
                     onClick={onBack}
                   />
                 }
@@ -2393,7 +2389,7 @@ function QuizResultCard({
         </div>
 
         <AlertDialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent className="quiz-result-dialog">
             <AlertDialogHeader>
               <AlertDialogTitle>Save quiz result?</AlertDialogTitle>
               <AlertDialogDescription>
@@ -2413,8 +2409,8 @@ function QuizResultCard({
       </div>
       </IllustratedPeekFrame>
 
-      <div className="w-full max-w-xl flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-muted-foreground px-1">Review</h3>
+      <div className="quiz-result-review w-full max-w-xl flex flex-col gap-2">
+        <h3 className="text-sm font-semibold px-1">Review</h3>
         <ol className="flex flex-col gap-2">
           {perCardSnapshot.map((row, i) => {
             const wasCorrect = row.correct;
@@ -2427,13 +2423,7 @@ function QuizResultCard({
             return (
               <li
                 key={`${row.cardId}-${i}`}
-                className={`rounded-lg border p-3 text-left ${
-                  wasCorrect
-                    ? "border-emerald-500/30 bg-emerald-500/5"
-                    : wasAnswered
-                      ? "border-rose-500/30 bg-rose-500/5"
-                      : "border-border bg-muted/20"
-                }`}
+                className="quiz-result-review-card rounded-lg border p-3 text-left"
               >
                 <div className="flex items-start gap-2">
                   {wasCorrect ? (

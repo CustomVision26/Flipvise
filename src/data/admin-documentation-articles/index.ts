@@ -438,7 +438,7 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "switch",
         title: "Master switch",
         bullets: [
-          "Enable Illustrated Deck Design allows users on every plan except Free to opt in from Manage account → Appearance. Free accounts stay on the standard design.",
+          "Enable Illustrated Deck Design allows users on every plan, including Free, to opt in from Manage account → Appearance.",
           "Off shows the standard design everywhere. Saved user preferences are not cleared.",
           "Save changes records administrator id, previous value, new value, timestamp, and action illustrated_design_enabled.",
           "Visible online sessions update within about 60 seconds, or when the window regains focus or reconnects.",

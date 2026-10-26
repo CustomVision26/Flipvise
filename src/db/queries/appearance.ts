@@ -7,6 +7,7 @@ import {
 } from "@/db/schema";
 import {
   ILLUSTRATED_DESIGN_AUDIT_ACTION,
+  clampBackgroundChangeHours,
   coalesceGlobalAppearance,
   coalesceUserAppearance,
   planAllowsIllustratedDesign,
@@ -40,11 +41,17 @@ export async function getPublicAppearanceAvailability(): Promise<{
 export async function getCurrentUserAppearancePreferences(userId: string): Promise<{
   illustratedDesignPreferred: boolean;
   reduceAnimations: boolean;
+  backgroundChangeEnabled: boolean;
+  backgroundChangeHours: number;
+  backgroundRotationStartedAt: string | null;
 }> {
   const rows = await db
     .select({
       illustratedDesignPreferred: userAppearancePreferences.illustratedDesignPreferred,
       reduceAnimations: userAppearancePreferences.reduceAnimations,
+      backgroundChangeEnabled: userAppearancePreferences.backgroundChangeEnabled,
+      backgroundChangeHours: userAppearancePreferences.backgroundChangeHours,
+      backgroundRotationStartedAt: userAppearancePreferences.backgroundRotationStartedAt,
     })
     .from(userAppearancePreferences)
     .where(eq(userAppearancePreferences.userId, userId))
@@ -66,6 +73,9 @@ export async function getAppearanceSnapshot(
       userPreferred: false,
       userReduceAnimations: false,
       planAllowsIllustrated: false,
+      backgroundChangeEnabled: false,
+      backgroundChangeHours: 24,
+      backgroundRotationStartedAt: null,
     };
   }
   const user = await getCurrentUserAppearancePreferences(userId);
@@ -75,6 +85,9 @@ export async function getAppearanceSnapshot(
     userPreferred: user.illustratedDesignPreferred,
     userReduceAnimations: user.reduceAnimations,
     planAllowsIllustrated,
+    backgroundChangeEnabled: user.backgroundChangeEnabled,
+    backgroundChangeHours: user.backgroundChangeHours,
+    backgroundRotationStartedAt: user.backgroundRotationStartedAt,
   };
 }
 
@@ -83,6 +96,8 @@ export async function updateCurrentUserAppearancePreferences(
   patch: {
     illustratedDesignPreferred?: boolean;
     reduceAnimations?: boolean;
+    backgroundChangeEnabled?: boolean;
+    backgroundChangeHours?: number;
   },
   planSlug: string | null,
 ): Promise<PublicAppearanceSnapshot> {
@@ -90,7 +105,20 @@ export async function updateCurrentUserAppearancePreferences(
   const illustratedDesignPreferred =
     patch.illustratedDesignPreferred ?? existing.illustratedDesignPreferred;
   const reduceAnimations = patch.reduceAnimations ?? existing.reduceAnimations;
+  const backgroundChangeEnabled =
+    patch.backgroundChangeEnabled ?? existing.backgroundChangeEnabled;
+  const backgroundChangeHours = clampBackgroundChangeHours(
+    patch.backgroundChangeHours ?? existing.backgroundChangeHours,
+  );
+  const resetsClock =
+    patch.backgroundChangeEnabled !== undefined ||
+    patch.backgroundChangeHours !== undefined;
   const updatedAt = new Date();
+  const backgroundRotationStartedAt = resetsClock
+    ? updatedAt
+    : existing.backgroundRotationStartedAt
+      ? new Date(existing.backgroundRotationStartedAt)
+      : updatedAt;
 
   await db
     .insert(userAppearancePreferences)
@@ -98,6 +126,9 @@ export async function updateCurrentUserAppearancePreferences(
       userId,
       illustratedDesignPreferred,
       reduceAnimations,
+      backgroundChangeEnabled,
+      backgroundChangeHours,
+      backgroundRotationStartedAt,
       updatedAt,
     })
     .onConflictDoUpdate({
@@ -109,6 +140,13 @@ export async function updateCurrentUserAppearancePreferences(
         ...(patch.reduceAnimations !== undefined
           ? { reduceAnimations: patch.reduceAnimations }
           : {}),
+        ...(patch.backgroundChangeEnabled !== undefined
+          ? { backgroundChangeEnabled: patch.backgroundChangeEnabled }
+          : {}),
+        ...(patch.backgroundChangeHours !== undefined
+          ? { backgroundChangeHours }
+          : {}),
+        ...(resetsClock ? { backgroundRotationStartedAt } : {}),
         updatedAt,
       },
     });

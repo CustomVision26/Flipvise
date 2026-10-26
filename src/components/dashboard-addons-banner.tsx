@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Lock, Sparkles } from "lucide-react";
+import { Circle, Lock, Sparkles } from "lucide-react";
 import { createAddonCheckoutSessionAction } from "@/actions/addons";
 import { AI_ESSAY_ADDON_KEY, LIVE_CLASSROOM_ADDON_KEY } from "@/lib/addon-keys";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,12 @@ function colorIndexForAddon(key: string, index: number): number {
   return typeof mapped === "number" ? mapped : index % ADDON_CHIP_STYLES.length;
 }
 
+function headerAddonRank(key: string): number {
+  if (key === LIVE_CLASSROOM_ADDON_KEY) return 0;
+  if (key === AI_ESSAY_ADDON_KEY) return 1;
+  return 2;
+}
+
 type DashboardAddonsBannerProps = {
   addons: DashboardAddonBannerItem[];
   signedIn: boolean;
@@ -76,22 +83,61 @@ function AddonChipButton({
   item,
   colorIndex,
   onActivate,
+  header = false,
 }: {
   item: DashboardAddonBannerItem;
   colorIndex: number;
   onActivate: (item: DashboardAddonBannerItem) => void;
+  header?: boolean;
 }) {
-  const label = item.unlocked
-    ? `${item.name} · Open`
+  const headerName = item.name.replace(/^Flipvise\s+/i, "");
+  const headerLabel = item.unlocked
+    ? `${headerName} · Open`
     : item.comingSoon
-      ? `${item.name} · Coming soon`
-      : `${item.name} · Unlock`;
+      ? `${headerName} · Coming soon`
+      : `${headerName} · Unlock`;
   const chip = ADDON_CHIP_STYLES[colorIndex]!;
   const icon = ADDON_ICON_STYLES[colorIndex]!;
+  const HeaderIcon =
+    item.key === LIVE_CLASSROOM_ADDON_KEY
+      ? item.unlocked
+        ? Circle
+        : Lock
+      : item.unlocked
+        ? Sparkles
+        : Lock;
+
+  if (header) {
+    return (
+      <button
+        type="button"
+        data-addon-key={item.key}
+        onClick={() => onActivate(item)}
+        className="header-addon-pill"
+        title={item.blurb || item.name}
+      >
+        <span className="header-addon-glyph" aria-hidden>
+          {item.key === LIVE_CLASSROOM_ADDON_KEY && item.unlocked ? (
+            <Image
+              src="/artwork/home/team-students.png"
+              alt=""
+              width={40}
+              height={40}
+              className="header-addon-art"
+            />
+          ) : (
+            <HeaderIcon className="size-3.5 shrink-0" />
+          )}
+        </span>
+        <span className="whitespace-nowrap">{headerLabel}</span>
+      </button>
+    );
+  }
 
   return (
     <button
       type="button"
+      data-addon-key={item.key}
       onClick={() => onActivate(item)}
       className={cn(
         "inline-flex shrink-0 items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3 sm:py-1.5 sm:text-sm",
@@ -112,7 +158,13 @@ function AddonChipButton({
           <Lock className="size-3" />
         )}
       </span>
-      <span className="whitespace-nowrap">{label}</span>
+      <span className="whitespace-nowrap">
+        {item.unlocked
+          ? `${item.name} - Open`
+          : item.comingSoon
+            ? `${item.name} - Coming soon`
+            : `${item.name} - Unlock`}
+      </span>
     </button>
   );
 }
@@ -217,13 +269,21 @@ export function DashboardAddonsBanner({
     ) : variant === "header" ? (
       <div
         data-addons-banner="header"
-        className="relative w-full max-w-full overflow-hidden rounded-md border border-border bg-background text-foreground"
+        className="flex w-max max-w-full items-center gap-2 overflow-x-auto"
         role="region"
         aria-label="Premium add-ons"
       >
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-7 bg-gradient-to-r from-background to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-7 bg-gradient-to-l from-background to-transparent" />
-        {marqueeTrack}
+        {[...addons]
+          .sort((a, b) => headerAddonRank(a.key) - headerAddonRank(b.key))
+          .map((item, index) => (
+            <AddonChipButton
+              key={item.key}
+              item={item}
+              header
+              colorIndex={colorIndexForAddon(item.key, index)}
+              onActivate={onChipActivate}
+            />
+          ))}
       </div>
     ) : (
       <div

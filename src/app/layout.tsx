@@ -4,7 +4,9 @@ import { cookies, headers } from "next/headers";
 import { Poppins } from "next/font/google";
 import Image from "next/image";
 import { AppProviders } from "@/components/app-providers";
+import { ArtworkBackground } from "@/components/artwork-background";
 import { IllustratedAppearanceProvider } from "@/components/illustrated-appearance-provider";
+import { IllustratedDesignPrompt } from "@/components/illustrated/illustrated-design-prompt";
 import { getAppearanceSnapshot } from "@/db/queries/appearance";
 import {
   planAllowsIllustratedDesign,
@@ -296,6 +298,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col relative">
         <AppProviders>
           <IllustratedAppearanceProvider initial={appearanceInitial}>
+            <ArtworkBackground />
             {showHeaderChrome && (
               <AuthenticatedShellChrome>
                 <header
@@ -323,7 +326,10 @@ export default async function RootLayout({
                       <AppTopNav homeHref={dashboardHrefWithUserQuery} />
                     )}
                     {showHeaderAddons ? (
-                      <div className="hidden min-w-0 flex-1 sm:block sm:max-w-[min(22rem,42vw)] lg:max-w-[min(28rem,36vw)]">
+                      <div
+                        data-header-pills
+                        className="hidden min-w-0 items-center gap-2 sm:flex"
+                      >
                         <DashboardAddonsBanner
                           addons={addonBannerItems}
                           signedIn
@@ -333,7 +339,10 @@ export default async function RootLayout({
                     ) : null}
                   </div>
                   {showHeaderAddons ? (
-                    <div className="col-span-2 row-start-2 min-w-0 sm:hidden">
+                    <div
+                      data-header-pills
+                      className="col-span-2 row-start-2 flex min-w-0 items-center gap-2 overflow-x-auto sm:hidden"
+                    >
                       <DashboardAddonsBanner
                         addons={addonBannerItems}
                         signedIn
@@ -447,6 +456,7 @@ export default async function RootLayout({
               </div>
             </div>
             <SiteContactFooter />
+            <IllustratedDesignPrompt />
           </IllustratedAppearanceProvider>
         </AppProviders>
       </body>

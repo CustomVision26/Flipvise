@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   ARTWORK_SCENES,
   artworkBackgroundPath,
+  artworkSceneAfterSteps,
   pickArtworkScene,
   resolveArtworkTheme,
   selectArtworkScene,
@@ -55,6 +56,12 @@ describe("selectArtworkScene", () => {
     assert.equal(selectArtworkScene(null, () => 0), "woodland");
     assert.equal(selectArtworkScene("", () => 0.34), "learning");
     assert.equal(selectArtworkScene("nope", () => 0.9), "discovery");
+  });
+
+  it("advances the stored scene and wraps after discovery", () => {
+    assert.equal(artworkSceneAfterSteps("woodland", 0), "woodland");
+    assert.equal(artworkSceneAfterSteps("woodland", 1), "learning");
+    assert.equal(artworkSceneAfterSteps("discovery", 1), "woodland");
   });
 
   it("stays inside the catalog", () => {

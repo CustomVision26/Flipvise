@@ -37,7 +37,7 @@ function ViewPlansButton({
       type="button"
       variant={variant}
       size="sm"
-      className={cn("gap-2", className)}
+      className={cn("account-clerk-pill gap-2", className)}
       onClick={() => {
         window.location.assign(PRICING_PAGE_PATH);
       }}
@@ -55,6 +55,7 @@ import { CancelSubscriptionButton } from "@/components/cancel-subscription-butto
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import type { PlanHistoryRow } from "@/lib/plan-history-types";
 import { CreditCard, ExternalLink, Loader2, Shield, Zap } from "lucide-react";
+import Image from "next/image";
 
 /** Canonical in-app pricing page (see `src/app/pricing/page.tsx`). */
 const PRICING_PAGE_PATH = "/pricing" as const;
@@ -213,8 +214,15 @@ export function UserBillingPage() {
     serverAdminRoleLabel ?? clientPlanDisplay.adminRoleLabel;
 
   return (
-    <div ref={rootRef} className="flex flex-col gap-6 p-1 min-h-[120px]">
-      <div>
+    <div ref={rootRef} className="account-clerk-page account-billing-page flex min-h-[120px] flex-col gap-6 p-1">
+      <div className="account-clerk-header">
+        <Image
+          src="/artwork/home/billing-owl.png"
+          alt=""
+          width={200}
+          height={200}
+          className="account-clerk-owl"
+        />
         <h2 className="text-base font-semibold text-foreground">Billing</h2>
         <p className="text-sm text-muted-foreground mt-0.5">
           Manage your Flipvise subscription and payments.
@@ -223,7 +231,7 @@ export function UserBillingPage() {
 
       <Separator />
 
-      <div className="flex flex-col gap-3">
+      <div className="account-clerk-panel flex flex-col gap-3">
         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           Current plan
         </p>
@@ -274,7 +282,7 @@ export function UserBillingPage() {
 
       <Separator />
 
-      <div className="flex flex-col gap-3">
+      <div className="account-clerk-panel flex flex-col gap-3">
         {showPaidStripeControls && (
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-foreground">
@@ -329,7 +337,7 @@ export function UserBillingPage() {
 
       <Separator />
 
-      <div className="flex flex-col gap-3">
+      <div className="account-clerk-panel flex flex-col gap-3">
         <div>
           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
             Plan history

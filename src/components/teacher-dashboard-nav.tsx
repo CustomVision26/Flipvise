@@ -209,7 +209,7 @@ export function TeacherDashboardNavPanel({
     <div
       className={cn(
         teamAdminCardClass,
-        "overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-card/90 via-card/75 to-card/60 p-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-20px_rgba(0,0,0,0.55)] backdrop-blur-md",
+        "lesson-studio-nav overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-card/90 via-card/75 to-card/60 p-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_36px_-20px_rgba(0,0,0,0.55)] backdrop-blur-md",
         className,
       )}
     >

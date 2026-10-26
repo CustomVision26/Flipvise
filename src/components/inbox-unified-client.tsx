@@ -475,10 +475,8 @@ function InboxItemRow({
 
   return (
     <div
-      className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-start sm:justify-between ${
-        !item.isRead
-          ? "border-primary/25 bg-primary/5"
-          : "border-border bg-card/40"
+      className={`inbox-item flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-start sm:justify-between ${
+        !item.isRead ? "inbox-item-unread" : "inbox-item-read"
       }`}
     >
       {/* ── Left: icon + content ── */}
@@ -701,7 +699,7 @@ function InboxItemRow({
             type="button"
             variant="outline"
             size="sm"
-            className="h-7 gap-1.5 text-xs"
+            className="inbox-open-btn h-7 gap-1.5 text-xs"
             onClick={() => setMessageOpen((open) => !open)}
             aria-expanded={messageOpen}
           >
@@ -1032,7 +1030,7 @@ export function InboxUnifiedClient({ items }: { items: UnifiedInboxItem[] }) {
   }
 
   return (
-    <Tabs defaultValue="inbox" className="w-full gap-0">
+    <Tabs defaultValue="inbox" className="inbox-tabs w-full gap-0">
       <TabsList
         variant="line"
         className="h-auto w-full min-w-0 flex-wrap justify-start gap-0 border-b border-border bg-transparent p-0"

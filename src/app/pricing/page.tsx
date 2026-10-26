@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { ArrowLeft } from "lucide-react";
+import Image from "next/image";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { getAccessContext, guestAccessContext } from "@/lib/access";
@@ -134,7 +135,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-10 sm:px-6 sm:py-14">
+    <div className="pricing-page min-h-screen px-4 py-10 sm:px-6 sm:py-14">
       <Suspense fallback={null}>
         <StripeCheckoutToast />
       </Suspense>
@@ -151,7 +152,21 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
             {userId ? "Back to Dashboard" : "Back to Home"}
           </Link>
 
-          <div className="mx-auto max-w-2xl text-center">
+          <div className="pricing-hero mx-auto max-w-3xl text-center">
+            <Image
+              src="/artwork/home/pricing-books.png"
+              alt=""
+              width={200}
+              height={200}
+              className="pricing-books"
+            />
+            <Image
+              src="/artwork/home/pricing-owl.png"
+              alt=""
+              width={240}
+              height={240}
+              className="pricing-owl"
+            />
             <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
               Plans &amp; Pricing
             </p>
@@ -167,11 +182,12 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
                 <Link
                   href="/pricing/add-ons"
                   className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "inline-flex",
+                    buttonVariants({ size: "sm" }),
+                    "pricing-catalog inline-flex",
                   )}
                 >
                   Browse Add-on Catalog
+                  <ArrowRight className="size-3.5" aria-hidden />
                 </Link>
               </p>
             ) : null}

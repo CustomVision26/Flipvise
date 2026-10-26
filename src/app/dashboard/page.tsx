@@ -11,7 +11,8 @@ import {
   getClerkUserDisplayNameById,
 } from "@/lib/clerk-user-display";
 import Link from "next/link";
-import { Layers, BookOpen } from "lucide-react";
+import Image from "next/image";
+import { ChevronRight, Layers } from "lucide-react";
 import {
   buildResolvedTeamWorkspaceQueryString,
   canonicalDashboardPathRemovingSensitiveQuery,
@@ -157,10 +158,10 @@ function DashboardTeamHeading({
         <span className="shrink-0 text-foreground">Team Dashboard</span>
         {showTeamTierExtras && ownerName ? (
           <>
-            <span className="shrink-0 text-muted-foreground" aria-hidden>
+            <span className="shrink-0 text-foreground" aria-hidden>
               ·
             </span>
-            <span className="min-w-0 truncate font-semibold text-muted-foreground">
+            <span className="min-w-0 truncate font-semibold text-foreground">
               {ownerName}
             </span>
           </>
@@ -214,16 +215,20 @@ function DashboardTeamWorkspaceSubline({
 function DashboardAtmosphere({
   children,
   personal = false,
+  team = false,
 }: {
   children: ReactNode;
   personal?: boolean;
+  team?: boolean;
 }) {
   return (
     <div
       className={
         personal
           ? "personal-dashboard-page relative flex min-h-0 flex-1 flex-col overflow-hidden"
-          : "relative flex min-h-0 flex-1 flex-col overflow-hidden"
+          : team
+            ? "team-dashboard-page relative flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "relative flex min-h-0 flex-1 flex-col overflow-hidden"
       }
     >
       {personal ? <PersonalDashboardBackground /> : null}
@@ -246,15 +251,75 @@ const dashboardHeaderCardClass =
 const dashboardDeckPanelClass =
   "flex flex-1 flex-col gap-5 rounded-2xl border border-white/10 bg-card/45 p-4 shadow-xl shadow-black/20 backdrop-blur-xl animate-in fade-in-0 slide-in-from-bottom-3 duration-700 fill-mode-both sm:p-6";
 
-function DashboardHeaderCard({ children }: { children: ReactNode }) {
+function DashboardHeaderCard({
+  children,
+  team = false,
+}: {
+  children: ReactNode;
+  team?: boolean;
+}) {
   return (
-    <section className={dashboardHeaderCardClass}>
+    <section
+      className={`${dashboardHeaderCardClass} personal-dash-panel${team ? " team-dash-header team-dash-panel" : ""}`}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400"
       />
+      {team ? (
+        <Image
+          src="/artwork/home/team-dash-owl.png"
+          alt=""
+          width={320}
+          height={320}
+          className="team-dash-owl"
+        />
+      ) : null}
       {children}
     </section>
+  );
+}
+
+function TeamDashboardEmptyState({
+  title,
+  description,
+  note,
+}: {
+  title: string;
+  description: string;
+  note?: ReactNode;
+}) {
+  return (
+    <div className="team-dash-empty">
+      <Image
+        src="/artwork/home/team-telescope.png"
+        alt=""
+        width={360}
+        height={360}
+        className="team-dash-telescope"
+      />
+      <Image
+        src="/artwork/home/team-lightbulb.png"
+        alt=""
+        width={360}
+        height={360}
+        className="team-dash-bulb"
+      />
+      <div className="team-dash-empty-body">
+        <Image
+          src="/artwork/home/team-empty-robot.png"
+          alt=""
+          width={420}
+          height={420}
+          className="team-dash-robot"
+        />
+        <div className="space-y-1">
+          <p className="team-dash-empty-title">{title}</p>
+          <p className="team-dash-empty-note text-muted-foreground">{description}</p>
+          {note}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -429,13 +494,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       (await teamOwnsLiveClassroom(tw.teamId)).owns;
 
     return (
-      <DashboardAtmosphere>
+      <DashboardAtmosphere team>
         {showLiveClassroom ? (
           <div className="flex flex-wrap items-center gap-2">
             <LiveClassroomDashboardEntry />
           </div>
         ) : null}
-        <DashboardHeaderCard>
+        <DashboardHeaderCard team>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {teamWorkspaceTierExtras ? (
@@ -467,28 +532,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
         </DashboardHeaderCard>
-        <section className={dashboardDeckPanelClass}>
+        <section className={`${dashboardDeckPanelClass}${workspaceDecks.length === 0 ? " team-dash-panel" : ""}`}>
         {workspaceDecks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
-              <BookOpen className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-foreground text-sm">
-                {isEducationTeamAdminViewer ? "No decks yet" : "No decks assigned yet"}
-              </p>
-              <p className="text-muted-foreground text-xs max-w-xs">
-                {isEducationTeamAdminViewer
-                  ? "Create decks from Teacher tools or wait for your workspace owner to assign decks to you."
-                  : "Your workspace owner has not assigned any decks to you yet. Check back soon."}
-              </p>
-              {createQuotaDisplay != null ? (
+          <TeamDashboardEmptyState
+            title={isEducationTeamAdminViewer ? "No decks yet" : "No decks assigned yet"}
+            description={
+              isEducationTeamAdminViewer
+                ? "Create decks from Teacher tools or wait for your workspace owner to assign decks to you."
+                : "Your workspace owner has not assigned any decks to you yet. Check back soon."
+            }
+            note={
+              createQuotaDisplay != null ? (
                 <p className="text-muted-foreground text-xs tabular-nums">
                   Created {createQuotaDisplay.used} / {createQuotaDisplay.max}
                 </p>
-              ) : null}
-            </div>
-          </div>
+              ) : null
+            }
+          />
         ) : (
           <DeckGrid
             decks={workspaceDecks}
@@ -537,8 +597,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     const initialView = resolveViewMode(cookieStore.get(DECKS_VIEW_COOKIE)?.value);
     const assignedHeadingGroupName = assignedHeadingRow?.name ?? null;
     return (
-      <DashboardAtmosphere>
-        <DashboardHeaderCard>
+      <DashboardAtmosphere team>
+        <DashboardHeaderCard team>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {teamWorkspaceTierExtras ? (
@@ -564,17 +624,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
         </DashboardHeaderCard>
-        <section className={dashboardDeckPanelClass}>
+        <section className={`${dashboardDeckPanelClass}${assigned.length === 0 ? " team-dash-panel" : ""}`}>
         {assigned.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
-              <BookOpen className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-foreground text-sm">No decks assigned yet</p>
-              <p className="text-muted-foreground text-xs max-w-xs">Your team admin hasn&apos;t assigned any decks to you yet. Check back soon.</p>
-            </div>
-          </div>
+          <TeamDashboardEmptyState
+            title="No decks assigned yet"
+            description="Your team admin hasn't assigned any decks to you yet. Check back soon."
+          />
         ) : (
           <DeckGrid
             decks={assigned}
@@ -674,8 +729,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     const cookieTeamHeadingGroupName = cookieTeamHeadingRow?.name ?? null;
 
     return (
-      <DashboardAtmosphere>
-        <DashboardHeaderCard>
+      <DashboardAtmosphere team>
+        <DashboardHeaderCard team>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {teamWorkspaceTierExtras ? (
@@ -701,17 +756,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
         </DashboardHeaderCard>
-        <section className={dashboardDeckPanelClass}>
+        <section className={`${dashboardDeckPanelClass}${assigned.length === 0 ? " team-dash-panel" : ""}`}>
         {assigned.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 bg-muted/20 py-12 text-center px-4 sm:py-20">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/15 ring-1 ring-violet-400/30">
-              <BookOpen className="h-6 w-6 text-violet-200" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-foreground text-sm">No decks assigned yet</p>
-              <p className="text-muted-foreground text-xs max-w-xs">Your team admin hasn&apos;t assigned any decks to you yet. Check back soon.</p>
-            </div>
-          </div>
+          <TeamDashboardEmptyState
+            title="No decks assigned yet"
+            description="Your team admin hasn't assigned any decks to you yet. Check back soon."
+          />
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {assigned.map((d, index) => (
@@ -861,34 +911,48 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <StripeCheckoutToast />
       </Suspense>
       {showTeamOnboarding && (
-        <Alert className="animate-in fade-in-0 slide-in-from-top-2 duration-500 fill-mode-both">
-          <AlertTitle>Finish team setup</AlertTitle>
-          <AlertDescription className="flex flex-wrap items-center gap-2">
-            Create your first workspace and invite members.
-            <Link
-              href="/onboarding/team"
-              className={buttonVariants({ size: "sm" }) + " shrink-0"}
-            >
-              Continue setup
-            </Link>
-          </AlertDescription>
+        <Alert className="team-setup-banner animate-in fade-in-0 slide-in-from-top-2 duration-500 fill-mode-both">
+          <div className="team-setup-copy">
+            <AlertTitle>Finish team setup</AlertTitle>
+            <AlertDescription>
+              Create your first workspace and invite members.
+            </AlertDescription>
+          </div>
+          <Link href="/onboarding/team" className="team-setup-continue">
+            Continue setup
+            <ChevronRight className="size-4" aria-hidden />
+          </Link>
+          <Image
+            src="/artwork/home/setup-robot.png"
+            alt=""
+            width={180}
+            height={180}
+            className="team-setup-robot"
+          />
         </Alert>
       )}
 
       {/* Page header */}
       <DashboardHeaderCard>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 space-y-2">
-          <Badge variant="outline" className="gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          <Badge variant="outline" className="personal-dash-badge gap-1 text-[10px] uppercase tracking-[0.14em]">
             <Layers className="size-3" />
             Workspace
           </Badge>
           <DashboardPersonalHeading viewerName={personalViewerName} />
-          <p className="text-muted-foreground text-sm sm:text-base">
+          <p className="text-sm sm:text-base">
             Manage your flashcard decks
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <Image
+          src="/artwork/home/dash-grad-books.png"
+          alt=""
+          width={220}
+          height={220}
+          className="personal-dash-books"
+        />
+        <div className="personal-dash-actions flex flex-wrap items-center gap-2 sm:gap-3">
           <DashboardNativeActions />
           <AddDeckDialog
             isAtLimit={isAtLimit}
@@ -903,13 +967,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       {isFreePlan && (
         <div className="grid animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-75 fill-mode-both gap-4 sm:grid-cols-2">
           {/* Usage card */}
-          <Card className="border-border/70 bg-card/80 backdrop-blur-sm">
+          <Card className="personal-dash-panel border-border/70">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                <CardTitle className="text-sm font-medium uppercase tracking-wide">
                   Free Plan Usage
                 </CardTitle>
-                <Badge variant="secondary" className="text-xs">Free</Badge>
+                <Badge variant="secondary" className="personal-dash-badge text-xs">Free</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -938,13 +1002,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </Card>
 
           {/* Pro upgrade card */}
-          <Card className="border-primary/30 bg-primary/5 backdrop-blur-sm">
+          <Card className="personal-dash-panel personal-dash-upgrade">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                <CardTitle className="text-sm font-medium uppercase tracking-wide">
                   Upgrade to Pro
                 </CardTitle>
-                <Badge className="text-xs">Paid plans</Badge>
+                <Badge className="personal-dash-badge text-xs">Paid plans</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -966,7 +1030,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <CardFooter>
               <Link
                 href="/pricing"
-                className={buttonVariants({ size: "sm" }) + " w-full justify-center"}
+                className={buttonVariants({ size: "sm" }) + " personal-dash-action w-full justify-center"}
               >
                 View plans
               </Link>
@@ -992,28 +1056,28 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       )}
 
       {/* Deck grid */}
-      <section className={`${dashboardDeckPanelClass} dashboard-deck-panel`}>
+      <section className={`${dashboardDeckPanelClass} dashboard-deck-panel personal-dash-panel`}>
       {decks.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-14 text-center sm:py-24">
-          <div className="relative flex h-16 w-16 items-center justify-center">
-            <div
-              className="absolute inset-0 rounded-full bg-primary/15 blur-md animate-pulse-slow"
-              aria-hidden
-            />
-            <div className="relative flex h-14 w-14 items-center justify-center rounded-full border border-border/70 bg-card shadow-sm">
-              <Layers className="h-7 w-7 text-muted-foreground" />
-            </div>
-          </div>
+        <div className="personal-dash-empty flex flex-1 flex-col items-center justify-center gap-4 px-4 py-10 text-center sm:py-14">
+          <Image
+            src="/artwork/home/empty-deck-owl.png"
+            alt=""
+            width={280}
+            height={280}
+            className="personal-dash-empty-owl"
+          />
           <div className="space-y-1">
-            <p className="font-medium text-foreground text-sm">No decks yet</p>
-            <p className="text-muted-foreground text-xs max-w-xs">Create your first deck to start building your flashcard library.</p>
+            <p className="text-2xl font-bold">No decks yet</p>
+            <p className="text-sm max-w-sm">Create your first deck to start building your flashcard library.</p>
           </div>
+          <div className="personal-dash-actions">
           <AddDeckDialog
             triggerLabel="Create your first deck"
             isAtLimit={isAtLimit}
             forPersonalWorkspace
             speechToTextEnabled={ownSubscriberTeamTierExtras}
           />
+          </div>
         </div>
       ) : hasGroupedEducationDecks ? (
         <div className="space-y-8">

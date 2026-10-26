@@ -2141,7 +2141,7 @@ export function TeacherLessonBuilderForm({
       </AlertDialog>
 
       <Dialog open={regenerateDialogOpen} onOpenChange={setRegenerateDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="lesson-studio-dialog sm:max-w-lg">
           <TooltipProvider>
           <DialogHeader>
             <DialogTitle>Vocabulary teaching approach</DialogTitle>

@@ -2336,6 +2336,12 @@ export const userAppearancePreferences = pgTable('user_appearance_preferences', 
   userId: varchar({ length: 255 }).primaryKey(),
   illustratedDesignPreferred: boolean().notNull().default(false),
   reduceAnimations: boolean().notNull().default(false),
+  /** When true, background scenes advance on `backgroundChangeHours`. */
+  backgroundChangeEnabled: boolean().notNull().default(true),
+  /** Whole hours from 2 through 24. */
+  backgroundChangeHours: integer().notNull().default(24),
+  /** When the current interval began. Reset when the user changes the schedule. */
+  backgroundRotationStartedAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });
 

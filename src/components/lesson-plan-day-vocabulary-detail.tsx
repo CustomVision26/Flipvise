@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronRight, Loader2, Sparkles } from "lucide-react";
+import Image from "next/image";
+import {
+  BookOpen,
+  CalendarDays,
+  ChevronRight,
+  Clock,
+  Lightbulb,
+  Loader2,
+  Sparkles,
+  Target,
+  Users,
+} from "lucide-react";
 import { generateAllDaysVocabularyDetailAction, generateDayVocabularyDetailAction } from "@/actions/teacher-lesson-plan";
 import { userFacingServerActionError } from "@/lib/server-action-client-error";
 import { Button } from "@/components/ui/button";
@@ -121,8 +132,13 @@ function DayListTextarea({
 
 function VocabularySummaryBox({ terms }: { terms: LessonPlanVocabularyTermDetail[] }) {
   return (
-    <div data-studio-vocab className="rounded-md border border-border bg-muted/40 p-3">
-      <p className="text-sm font-medium text-foreground">Vocabulary</p>
+    <div data-studio-vocab className="lesson-studio-vocab rounded-md border border-border bg-muted/40 p-3">
+      <p className="lesson-studio-label text-sm font-medium text-foreground">
+        <span className="lesson-studio-chip" data-accent="sky">
+          <BookOpen className="size-3.5" aria-hidden />
+        </span>
+        Vocabulary
+      </p>
       <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
         {terms.map((term) => (
           <li key={term.term}>
@@ -251,8 +267,13 @@ function EditableVocabularySummaryBox({
   }
 
   return (
-    <div data-studio-vocab className="space-y-3 rounded-md border border-border bg-muted/40 p-3">
-      <p className="text-sm font-medium text-foreground">Vocabulary</p>
+    <div data-studio-vocab className="lesson-studio-vocab space-y-3 rounded-md border border-border bg-muted/40 p-3">
+      <p className="lesson-studio-label text-sm font-medium text-foreground">
+        <span className="lesson-studio-chip" data-accent="sky">
+          <BookOpen className="size-3.5" aria-hidden />
+        </span>
+        Vocabulary
+      </p>
       <p className="text-xs text-muted-foreground">
         Press Enter for a new line. Use <span className="font-medium">Term — definition</span>{" "}
         on the first line, or put the definition on the lines below the term.
@@ -307,10 +328,13 @@ function FiveEBreakdownSection({
           <li
             key={phase.phase}
             data-studio-phase={phase.phase}
-            className="space-y-2 rounded-md border border-border bg-muted/30 p-3"
+            className="lesson-studio-phase space-y-2 rounded-md border border-border bg-muted/30 p-3"
           >
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <p className="text-sm font-semibold text-foreground">
+              <p className="lesson-studio-label text-sm font-semibold text-foreground">
+                <span className="lesson-studio-chip" data-accent="amber">
+                  <Lightbulb className="size-3.5" aria-hidden />
+                </span>
                 {phase.timeRange}: {phase.phase}
               </p>
               <p className="text-sm text-muted-foreground">{phase.activitySummary}</p>
@@ -323,8 +347,11 @@ function FiveEBreakdownSection({
               </p>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-foreground">
+              <div className="lesson-studio-role lesson-studio-role-teacher space-y-1">
+                <p className="lesson-studio-label text-xs font-medium uppercase tracking-wide text-foreground">
+                  <span className="lesson-studio-chip" data-accent="violet">
+                    <Users className="size-3.5" aria-hidden />
+                  </span>
                   Teacher
                 </p>
                 <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
@@ -333,8 +360,11 @@ function FiveEBreakdownSection({
                   ))}
                 </ul>
               </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-foreground">
+              <div className="lesson-studio-role lesson-studio-role-student space-y-1">
+                <p className="lesson-studio-label text-xs font-medium uppercase tracking-wide text-foreground">
+                  <span className="lesson-studio-chip" data-accent="sky">
+                    <Users className="size-3.5" aria-hidden />
+                  </span>
                   Students
                 </p>
                 <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
@@ -717,10 +747,15 @@ export function LessonPlanWeeklySchedulePanel({
 
   return (
     <>
-      <div className="space-y-4">
+      <div className="lesson-studio-schedule space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium text-foreground">Daily Schedule</p>
+            <p className="lesson-studio-label font-medium text-foreground">
+              <span className="lesson-studio-chip" data-accent="violet">
+                <CalendarDays className="size-3.5" aria-hidden />
+              </span>
+              Daily Schedule
+            </p>
             <TeacherHelpBalloon
               label="Daily Schedule"
               help={
@@ -757,7 +792,7 @@ export function LessonPlanWeeklySchedulePanel({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 gap-1.5"
+                  className="lesson-studio-expand h-8 gap-1.5"
                   disabled={isBulkBusy || generatingDayIndex != null}
                   onClick={() => void generateAllDaysDetail()}
                 >
@@ -810,7 +845,8 @@ export function LessonPlanWeeklySchedulePanel({
             <div
               key={`schedule-day-${dayIndex}`}
               data-studio-day=""
-              className="space-y-3 rounded-md border border-border p-3"
+              data-day-tone={dayIndex % 2 === 0 ? "gold" : "mint"}
+              className="lesson-studio-day space-y-3 rounded-md border border-border p-3"
             >
               <div className="flex items-start justify-between gap-2">
                 {editable ? (
@@ -871,7 +907,7 @@ export function LessonPlanWeeklySchedulePanel({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-8 shrink-0 px-2 text-xs"
+                    className="lesson-studio-view h-8 shrink-0 px-2 text-xs"
                     disabled={isGenerating}
                     onClick={() => openDayDetail(dayIndex)}
                   >
@@ -882,7 +918,10 @@ export function LessonPlanWeeklySchedulePanel({
 
               {editable ? (
                 <div className="space-y-2">
-                  <Label htmlFor={`day-${dayIndex}-focus`} className="text-sm text-foreground">
+                  <Label htmlFor={`day-${dayIndex}-focus`} className="lesson-studio-label text-sm text-foreground">
+                    <span className="lesson-studio-chip" data-accent="emerald">
+                      <Target className="size-3.5" aria-hidden />
+                    </span>
                     Daily focus
                   </Label>
                   <Textarea
@@ -896,11 +935,24 @@ export function LessonPlanWeeklySchedulePanel({
                   />
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">{day.dailyFocus}</p>
+                <div className="space-y-2">
+                  <p className="lesson-studio-label text-sm font-medium text-foreground">
+                    <span className="lesson-studio-chip" data-accent="emerald">
+                      <Target className="size-3.5" aria-hidden />
+                    </span>
+                    Daily focus
+                  </p>
+                  <p className="lesson-studio-field text-sm text-muted-foreground">{day.dailyFocus}</p>
+                </div>
               )}
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Vocabulary</p>
+                <p className="lesson-studio-label text-sm font-medium text-foreground">
+                  <span className="lesson-studio-chip" data-accent="sky">
+                    <BookOpen className="size-3.5" aria-hidden />
+                  </span>
+                  Vocabulary
+                </p>
 
                 {editable ? (
                   day.vocabularyDetail ? (
@@ -934,7 +986,10 @@ export function LessonPlanWeeklySchedulePanel({
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">
+                <p className="lesson-studio-label text-sm font-medium text-foreground">
+                  <span className="lesson-studio-chip" data-accent="violet">
+                    <Clock className="size-3.5" aria-hidden />
+                  </span>
                   {useFiveEModel ? "Class timeline (5E)" : "Class timeline"}
                 </p>
                 {editable ? (
@@ -973,10 +1028,17 @@ export function LessonPlanWeeklySchedulePanel({
           if (!open) setDetailDayIndex(null);
         }}
       >
-        <SheetContent side="right" data-studio-detail="" className="w-full gap-0 p-0 sm:max-w-xl">
+        <SheetContent side="right" data-studio-detail="" className="lesson-studio-detail w-full gap-0 p-0 sm:max-w-xl">
           {detailDay?.vocabularyDetail ? (
             <>
-              <SheetHeader className="border-b border-border px-6 py-4 text-left">
+              <SheetHeader className="lesson-studio-detail-header border-b border-border px-6 py-4 text-left">
+                <Image
+                  src="/artwork/home/docs-article-owl.png"
+                  alt=""
+                  width={96}
+                  height={96}
+                  className="lesson-studio-owl"
+                />
                 <SheetTitle className="text-foreground">
                   {useFiveEModel
                     ? `${detailDay.dayLabel} — Vocabulary & 5E detail`

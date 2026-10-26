@@ -11,7 +11,20 @@ import {
   useContext,
 } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Maximize2, Minimize2, Sparkles } from "lucide-react";
+import Image from "next/image";
+import {
+  ArrowLeft,
+  BookOpen,
+  Clock,
+  Cloud,
+  Lightbulb,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Pencil,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +66,15 @@ const PREVIEW_SECTION_RAILS = {
   cyan: "from-cyan-300 via-sky-400 to-blue-300",
 } as const;
 
+const PREVIEW_SECTION_ICONS = {
+  emerald: Target,
+  sky: BookOpen,
+  violet: Cloud,
+  amber: Pencil,
+  rose: Lightbulb,
+  cyan: Clock,
+} as const;
+
 export type TeacherPreviewAccent = keyof typeof PREVIEW_SECTION_ACCENTS;
 
 /** Colored block inside a teacher-tool preview. Built from the shadcn Card. */
@@ -65,12 +87,14 @@ export function TeacherPreviewSection({
   accent?: TeacherPreviewAccent;
   children: ReactNode;
 }) {
+  const Icon = PREVIEW_SECTION_ICONS[accent];
   return (
     <Card
       size="sm"
       data-studio-section=""
+      data-accent={accent}
       className={cn(
-        "gap-2 overflow-hidden border py-0 shadow-sm transition-shadow duration-300 hover:shadow-md",
+        "lesson-studio-section gap-2 overflow-hidden border py-0 shadow-sm transition-shadow duration-300 hover:shadow-md",
         PREVIEW_SECTION_ACCENTS[accent],
       )}
     >
@@ -79,7 +103,10 @@ export function TeacherPreviewSection({
         className={cn("h-1 w-full bg-gradient-to-r", PREVIEW_SECTION_RAILS[accent])}
       />
       <CardHeader className="px-4 pt-3 pb-0">
-        <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+          <span className="lesson-studio-chip" data-accent={accent}>
+            <Icon className="size-4" aria-hidden />
+          </span>
           {title}
         </CardTitle>
       </CardHeader>
@@ -197,7 +224,7 @@ export function TeacherToolPageShell({
       <Button
         type="submit"
         size="lg"
-        className="gap-2"
+        className="lesson-studio-generate gap-2"
         disabled={isGenerating || submitDisabled}
       >
         {isGenerating ? (
@@ -219,8 +246,8 @@ export function TeacherToolPageShell({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-      <Card className={cn(teamAdminCardClass, "relative overflow-hidden border-white/10 bg-card/70 shadow-lg shadow-black/15 backdrop-blur-md")}>
+    <div className="lesson-studio mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+      <Card className={cn(teamAdminCardClass, "lesson-studio-hero relative overflow-hidden border-white/10 bg-card/70 shadow-lg shadow-black/15 backdrop-blur-md")}>
         <div
           aria-hidden
           className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-violet-400 to-rose-400"
@@ -249,6 +276,13 @@ export function TeacherToolPageShell({
               </div>
             </div>
             {headerExtra}
+            <Image
+              src="/artwork/home/docs-owl.png"
+              alt=""
+              width={92}
+              height={92}
+              className="lesson-studio-owl"
+            />
           </div>
         </CardHeader>
       </Card>

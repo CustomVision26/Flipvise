@@ -36,6 +36,13 @@ export function pickArtworkScene(random: () => number = Math.random): ArtworkSce
   return ARTWORK_SCENES[index] ?? "woodland";
 }
 
+/** Advance a stored scene. Step 0 keeps it. */
+export function artworkSceneAfterSteps(scene: ArtworkScene, step: number): ArtworkScene {
+  if (step <= 0) return scene;
+  const start = Math.max(0, ARTWORK_SCENES.indexOf(scene));
+  return ARTWORK_SCENES[(start + step) % ARTWORK_SCENES.length] ?? scene;
+}
+
 /** Keep a stored scene. A new tab with nothing stored picks once. */
 export function selectArtworkScene(
   stored: string | null | undefined,

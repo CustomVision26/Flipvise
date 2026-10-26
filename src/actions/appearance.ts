@@ -12,6 +12,8 @@ import {
   updateCurrentUserAppearancePreferences,
 } from "@/db/queries/appearance";
 import {
+  BACKGROUND_CHANGE_HOURS_MAX,
+  BACKGROUND_CHANGE_HOURS_MIN,
   canUpdateGlobalAppearance,
   canUpdateUserAppearance,
 } from "@/lib/illustrated-appearance";
@@ -33,11 +35,20 @@ const userPatchSchema = z
   .object({
     illustratedDesignPreferred: z.boolean().optional(),
     reduceAnimations: z.boolean().optional(),
+    backgroundChangeEnabled: z.boolean().optional(),
+    backgroundChangeHours: z
+      .number()
+      .int()
+      .min(BACKGROUND_CHANGE_HOURS_MIN)
+      .max(BACKGROUND_CHANGE_HOURS_MAX)
+      .optional(),
   })
   .refine(
     (value) =>
       value.illustratedDesignPreferred !== undefined ||
-      value.reduceAnimations !== undefined,
+      value.reduceAnimations !== undefined ||
+      value.backgroundChangeEnabled !== undefined ||
+      value.backgroundChangeHours !== undefined,
     { message: "No appearance fields submitted." },
   );
 
@@ -78,6 +89,8 @@ export async function updateCurrentUserAppearancePreferencesAction(
       {
         illustratedDesignPreferred: parsed.data.illustratedDesignPreferred,
         reduceAnimations: parsed.data.reduceAnimations,
+        backgroundChangeEnabled: parsed.data.backgroundChangeEnabled,
+        backgroundChangeHours: parsed.data.backgroundChangeHours,
       },
       resolvePlanSlugForAddonEligibility(access),
     );

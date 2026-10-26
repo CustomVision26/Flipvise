@@ -22,7 +22,6 @@ import { NativeAppBootstrap } from "@/components/native-app-bootstrap";
 import { NativeNotificationBootstrap } from "@/components/native-notification-bootstrap";
 import { OfflineBanner } from "@/components/offline-banner";
 import { useClientMounted } from "@/lib/use-client-mounted";
-import { ArtworkBackground } from "@/components/artwork-background";
 
 const clerkLogo = {
   logoImageUrl: resolveLogoImageUrl(),
@@ -115,7 +114,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       <ThemeStorageNormalize>
         <DocsUiGuideProvider>
           <ClerkWithTheme>
-            <ArtworkBackground />
             <div className="relative z-[1] flex min-h-full w-full flex-1 flex-col">
               <NativeAppBootstrap />
               <NativeNotificationBootstrap />

@@ -1,13 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
-import { Switch } from "@/components/ui/switch";
+import {
+  BACKGROUND_CHANGE_HOURS_MAX,
+  BACKGROUND_CHANGE_HOURS_MIN,
+  clampBackgroundChangeHours,
+} from "@/lib/illustrated-appearance";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 
 export function AppearanceSettingsSection() {
   const appearance = useIllustratedAppearance();
-  const freePlan = !appearance.planAllowsIllustrated;
-  const unavailable = freePlan || !appearance.globalEnabled;
+  const unavailable = !appearance.globalEnabled;
+  const [hours, setHours] = useState(appearance.backgroundChangeHours);
+  useEffect(() => {
+    setHours(appearance.backgroundChangeHours);
+  }, [appearance.backgroundChangeHours]);
+  const scheduleLocked = !appearance.backgroundChangeEnabled;
   const status = appearance.saving
     ? "Saving appearance settings."
     : appearance.error
@@ -22,21 +33,14 @@ export function AppearanceSettingsSection() {
           Show cartoon-style artwork and layered designs across your decks and study screens.
         </p>
         <p className="text-sm text-muted-foreground">
-          Your study content and available features stay the same. Cartoon style is included on every plan except Free.
+          Your study content and available features stay the same. Cartoon artwork and backgrounds are included on every plan, including Free.
         </p>
       </div>
 
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <Label htmlFor="illustrated-deck-design">Illustrated Deck Design</Label>
-          {freePlan ? (
-            <p id="illustrated-deck-design-note" className="text-sm text-muted-foreground">
-              Free accounts use the standard design. Cartoon style is available on every other plan.
-              {appearance.userPreferred
-                ? " Saved preference: on. This is not the active appearance."
-                : ""}
-            </p>
-          ) : unavailable ? (
+          {unavailable ? (
             <p id="illustrated-deck-design-note" className="text-sm text-muted-foreground">
               Illustrated designs are temporarily unavailable. Your preference will be remembered.
               {appearance.userPreferred
@@ -62,6 +66,53 @@ export function AppearanceSettingsSection() {
             });
           }}
         />
+      </div>
+
+      <div className="space-y-3 border-t border-border pt-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="background-artwork-changes">Change background artwork</Label>
+            <p id="background-artwork-changes-note" className="text-sm text-muted-foreground">
+              {appearance.backgroundChangeEnabled
+                ? `The scene you see now stays for ${hours} hours, then changes to the next scene. Choose anywhere from ${BACKGROUND_CHANGE_HOURS_MIN} hours to ${BACKGROUND_CHANGE_HOURS_MAX} hours.`
+                : "Background artwork stays on the current scene."}
+            </p>
+          </div>
+          <Switch
+            id="background-artwork-changes"
+            checked={appearance.backgroundChangeEnabled}
+            disabled={appearance.saving || !appearance.userId}
+            aria-describedby="background-artwork-changes-note"
+            onCheckedChange={(checked) => {
+              void appearance.updatePreferences({ backgroundChangeEnabled: checked });
+            }}
+          />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="background-change-hours">Hours between changes</Label>
+            <p className="text-sm font-medium text-foreground tabular-nums">{hours} hours</p>
+          </div>
+          <Slider
+            id="background-change-hours"
+            min={BACKGROUND_CHANGE_HOURS_MIN}
+            max={BACKGROUND_CHANGE_HOURS_MAX}
+            step={1}
+            value={hours}
+            disabled={scheduleLocked || appearance.saving || !appearance.userId}
+            getAriaLabel={() => "Hours between background changes"}
+            getAriaValueText={(_formatted, value) => `${value} hours`}
+            onValueChange={(value) => {
+              const next = clampBackgroundChangeHours(Array.isArray(value) ? value[0] : value);
+              setHours(next);
+            }}
+            onValueCommitted={(value) => {
+              const next = clampBackgroundChangeHours(Array.isArray(value) ? value[0] : value);
+              if (next === appearance.backgroundChangeHours) return;
+              void appearance.updatePreferences({ backgroundChangeHours: next });
+            }}
+          />
+        </div>
       </div>
 
       <div className="flex items-start justify-between gap-4 border-t border-border pt-4">

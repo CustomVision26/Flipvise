@@ -21,9 +21,9 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         bullets: [
           "Open personal dashboard guide to follow the screenshots in order. The guide stays open if you leave this page — close it only when you are finished.",
           "The heading shows Personal Dashboard : your name, or your email if no name is on the account.",
-          "Deck grid, list, or compact tiles. Hover a deck tile to preview its cover image when one is set (the cover is not a flashcard). Deck cards use a colored accent, a short entrance, and a hover shine. A chosen background gradient or cover image stays on the card. Illustrated Deck Design, when on, uses artwork and a card stack on grid and compact tiles. The heading and deck list panel are clear so the background artwork shows through, and the Showing line and View controls sit on a light surface.",
+          "Deck grid, list, or compact tiles. Hover a deck tile to preview its cover image when one is set (the cover is not a flashcard). Deck cards use a colored accent, a short entrance, and a hover shine. A chosen background gradient or cover image stays on the card. Illustrated Deck Design, when on, uses artwork and a card stack on grid and compact tiles. The heading, plan cards, and empty library sit on solid panels that stay readable in light and dark, with an owl when you have no decks.",
           "Education Gold and Education Enterprise keep personal decks in the Personal section. Under Workspaces, the Workspace menu shows the workspace name. Select a workspace to list team-admin decks apart from your lesson-plan decks. A lesson-plan deck you save from a team admin’s deck is stored only under Owner lesson plans and is not copied onto that team admin’s Team Dashboard. The AI Lesson Builder for the plan owner guide and the AI Lesson Builder for a new deck guide both show that Owner lesson plans group after Save Lesson Plan.",
-          "Add Deck opens creation: name/subject/course, description/topic, grade, difficulty, optional deck cover image, and gradient.",
+          "Add Deck opens creation: name, subject, or course, description or topic, grade, difficulty, optional deck cover image, and gradient.",
           "Edit deck updates the same metadata and cover image from a deck card menu. The cover is not a flashcard.",
           "Delete deck confirms first. Education plans get a detailed impact list: linked lesson plans stay in the Resource Library; Edit and Create Quiz stay available when another related deck (for example a quiz deck from that plan) can take over the link, and become unavailable only when this is the last linked deck. On a non-Education plan with leftover Education lesson-plan links, the dialog warns that the Education link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
           "Each deck card links to the deck editor and study session.",
@@ -140,7 +140,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "ai-essay",
         title: "Add-ons on Team Dashboard",
         bullets: [
-          "The same premium add-ons running banner appears above the workspace heading. Team Dashboard uses the same colored page wash, header bar, and deck cards as Personal Dashboard.",
+          "The same premium add-ons running banner appears above the workspace heading. The Team Dashboard heading is a solid card with an owl on books, and an empty library is a solid card with a reading robot, a telescope, and a lightbulb. Those cards stay readable in light and dark. The Flipvise logo is not used there.",
           "Hover a deck tile to preview its cover image when one is set. Click a deck once to open the compact menu (Study and Preview cards). Open deck, Edit deck, and Delete deck appear only for decks you created. Deck card counts exclude the optional cover image — covers are not flashcards. Illustrated Deck Design uses the same artwork on these tiles when it is enabled, and the deck list panel stays clear so that artwork shows through.",
           "Unlocked members can open the AI Essay workspace from the AI Essay chip.",
         ],

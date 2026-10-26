@@ -1,10 +1,11 @@
 "use client";
 
-import { UserButton, useAuth, useClerk, useUser } from "@clerk/nextjs";
+import { UserButton, useAuth, useUser } from "@clerk/nextjs";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { AccountAvatarTools } from "@/components/account-avatar-tools";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
@@ -34,7 +35,17 @@ import { useClientMounted } from "@/lib/use-client-mounted";
 import { NATIVE_SIGNING_OUT_KEY } from "@/components/native-home-sign-out-guard";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { isNonStripePersonalPlanGrant } from "@/lib/personal-plan-access-ui";
-import { CreditCard, Gift, IdCard, Megaphone, Palette, Shield } from "lucide-react";
+import {
+  ClipboardList,
+  CreditCard,
+  Crown,
+  Gift,
+  IdCard,
+  Megaphone,
+  Palette,
+  Shield,
+  User,
+} from "lucide-react";
 
 const profilePageLoading = () => (
   <p className="px-1 py-4 text-sm text-muted-foreground">Loading…</p>
@@ -72,7 +83,6 @@ const AccountDeleteDialog = dynamic(
 );
 
 const NATIVE_AFTER_SIGN_OUT_URL = "/native-signout";
-const CLERK_BILLING_START_PATH = "/billing";
 const CLERK_USER_BUTTON_TRIGGER = ".cl-userButtonTrigger";
 const CLERK_MANAGE_ACCOUNT_ACTION =
   "[data-localization-key='userButton.action__manageAccount']";
@@ -116,29 +126,11 @@ function clickClerkBillingNav(): boolean {
   return false;
 }
 
-async function openClerkAccountBillingModal(
-  fallbackOpenUserProfile: (props: {
-    __experimental_startPath: string;
-  }) => void,
-): Promise<void> {
-  if (clickClerkUserButtonTrigger()) {
-    let openedManageAccount = false;
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      await waitMs(40);
-      if (clickClerkManageAccount()) {
-        openedManageAccount = true;
-        break;
-      }
-    }
-    if (!openedManageAccount) {
-      fallbackOpenUserProfile({
-        __experimental_startPath: CLERK_BILLING_START_PATH,
-      });
-    }
-  } else {
-    fallbackOpenUserProfile({
-      __experimental_startPath: CLERK_BILLING_START_PATH,
-    });
+async function openClerkAccountBillingModal(): Promise<void> {
+  if (!clickClerkUserButtonTrigger()) return;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await waitMs(40);
+    if (clickClerkManageAccount()) break;
   }
   for (let attempt = 0; attempt < 8; attempt += 1) {
     await waitMs(60);
@@ -216,7 +208,6 @@ export function HeaderUserSection({
 }: HeaderUserSectionProps) {
   const pathname = usePathname();
   const { userId, isLoaded: authLoaded } = useAuth();
-  const { openUserProfile } = useClerk();
   const { user } = useUser();
   const clientMounted = useClientMounted();
 
@@ -385,10 +376,10 @@ export function HeaderUserSection({
   const planNameTooltip = isComplimentaryGrant
     ? `${personalAccountPlanLabel} is complimentary — not a paid subscription. View account billing.`
     : `${personalAccountPlanLabel} plan — view account billing`;
-  const PlansIcon = isComplimentaryGrant ? Gift : CreditCard;
+  const PlansIcon = isComplimentaryGrant ? Gift : ClipboardList;
 
   function openAccountBilling() {
-    void openClerkAccountBillingModal(openUserProfile);
+    void openClerkAccountBillingModal();
   }
 
   return (
@@ -402,14 +393,14 @@ export function HeaderUserSection({
       >
         <div
           data-header-promo-links
-          className="mr-0.5 flex shrink-0 items-center gap-1 sm:mr-1"
+          className="mr-0.5 flex shrink-0 items-center gap-2 sm:mr-1"
         >
           <HeaderNavTooltip label={plansTooltip}>
             <Link
               href="/pricing"
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
-                "inline-flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-xs sm:px-3",
+                "header-plans-pill inline-flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-xs sm:px-3",
                 isPricing && "bg-muted/70 text-foreground",
               )}
               aria-current={isPricing ? "page" : undefined}
@@ -419,26 +410,6 @@ export function HeaderUserSection({
               <span className="hidden min-[420px]:inline">Plans</span>
             </Link>
           </HeaderNavTooltip>
-          {showTeacherNavButton ? (
-            <span className="inline-flex shrink-0 items-center">
-              <TeacherNavIconButton />
-            </span>
-          ) : null}
-          {showAffiliatePortal ? (
-            <HeaderNavTooltip label="Affiliate portal">
-              <Link
-                href="/dashboard/affiliate"
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "sm" }),
-                  "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
-                )}
-                aria-label="Affiliate portal"
-              >
-                <Megaphone className="size-3.5 shrink-0 text-violet-800 dark:text-violet-200" aria-hidden />
-                <span className="hidden xl:inline">Affiliate</span>
-              </Link>
-            </HeaderNavTooltip>
-          ) : null}
         </div>
         <div
           data-header-icon-tools
@@ -450,23 +421,25 @@ export function HeaderUserSection({
               type="button"
               variant="ghost"
               onClick={openAccountBilling}
-              className={cn(
-                "mr-0.5 h-auto max-w-[5.5rem] shrink-0 truncate px-0 py-0 text-xs font-medium text-muted-foreground hover:bg-transparent hover:text-foreground min-[380px]:max-w-[7rem] sm:mr-1 sm:max-w-[9rem] sm:text-sm lg:max-w-[11rem]",
-                isPro && "text-foreground",
-              )}
+              className="header-plan-badge"
               aria-label={planNameTooltip}
             >
+              <Crown className="size-3.5 shrink-0" aria-hidden />
               {personalAccountPlanLabel}
             </Button>
           </HeaderNavTooltip>
         ) : null}
         {portalsReady ? (
           <>
-            <span
-              data-header-account-menu
-              className="inline-flex shrink-0 items-center"
-              title="Account — profile, account details, appearance, and billing"
-            >
+            <span className="header-avatar-shell">
+              <span className="header-avatar-face" aria-hidden>
+                <User className="size-4" />
+              </span>
+              <span
+                data-header-account-menu
+                className="header-avatar-hit"
+                title="Account — profile, account details, appearance, and billing"
+              >
               <UserButton>
                 {isAdmin && !hidePlatformAdminLink ? (
                   <UserButton.MenuItems>
@@ -507,8 +480,10 @@ export function HeaderUserSection({
                   <UserBillingPage />
                 </UserButton.UserProfilePage>
               </UserButton>
+              </span>
             </span>
             <AccountDeleteDialog />
+            <AccountAvatarTools />
           </>
         ) : null}
         {portalsReady ? (
@@ -526,8 +501,30 @@ export function HeaderUserSection({
             <InboxNavIconButton unreadCount={inboxUnreadCount} />
           </span>
         ) : null}
-        {portalsReady ? <DocsUiGuidesMenuButton /> : null}
+        {portalsReady ? (
+          <DocsUiGuidesMenuButton className="header-guides-pill" />
+        ) : null}
         </div>
+        {showTeacherNavButton ? (
+          <span className="inline-flex shrink-0 items-center">
+            <TeacherNavIconButton />
+          </span>
+        ) : null}
+        {showAffiliatePortal ? (
+          <HeaderNavTooltip label="Affiliate portal">
+            <Link
+              href="/dashboard/affiliate"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
+              )}
+              aria-label="Affiliate portal"
+            >
+              <Megaphone className="size-3.5 shrink-0 text-violet-800 dark:text-violet-200" aria-hidden />
+              <span className="hidden xl:inline">Affiliate</span>
+            </Link>
+          </HeaderNavTooltip>
+        ) : null}
       </div>
 
       {portalsReady && showWorkspaceSwitcherUi ? (

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Inbox } from "lucide-react";
@@ -655,9 +656,16 @@ export default async function DashboardInboxPage() {
   const unreadCount = items.filter((i) => !i.isRead).length;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
+    <div className="inbox-page flex flex-1 flex-col gap-6 p-4 sm:p-8">
       {/* ── Page header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="inbox-hero flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Image
+          src="/artwork/home/inbox-messenger-owl.png"
+          alt=""
+          width={220}
+          height={220}
+          className="inbox-owl"
+        />
         <div className="min-w-0 space-y-1">
           <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight sm:text-3xl">
             <Inbox className="size-7 shrink-0 sm:size-8" strokeWidth={1.75} aria-hidden />
@@ -677,7 +685,7 @@ export default async function DashboardInboxPage() {
           href="/dashboard"
           className={
             buttonVariants({ variant: "outline", size: "sm" }) +
-            " inline-flex shrink-0 gap-2 self-start sm:self-auto"
+            " inbox-back inline-flex shrink-0 gap-2 self-start sm:self-auto"
           }
         >
           <ArrowLeft className="size-4" aria-hidden />
@@ -686,7 +694,16 @@ export default async function DashboardInboxPage() {
       </div>
 
       {/* ── Unified inbox ── */}
-      <InboxUnifiedClient items={items} />
+      <div className="inbox-board">
+        <InboxUnifiedClient items={items} />
+        <Image
+          src="/artwork/home/inbox-fox.png"
+          alt=""
+          width={180}
+          height={180}
+          className="inbox-fox"
+        />
+      </div>
     </div>
   );
 }

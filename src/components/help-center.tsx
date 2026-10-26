@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState, useTransition, useRef, useCallback, useEffect } from "react";
 import { HELP_CENTER_OPEN_EVENT } from "@/lib/help-center-open";
 import {
@@ -819,9 +820,11 @@ function HelpLanding({
             key={id}
             type="button"
             onClick={() => onSelect(id)}
-            className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-left hover:bg-accent transition-colors w-full group"
+            className="help-row flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors w-full group"
           >
-            <Icon className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+            <span className={`help-icon help-icon-${id}`}>
+              <Icon className="h-5 w-5" />
+            </span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium leading-none">{label}</p>
@@ -891,7 +894,14 @@ export function HelpCenter({
         </Button>
       ) : null}
       <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">
+      <SheetContent side="right" className="help-center-sheet w-full sm:max-w-md flex flex-col gap-0 p-0">
+        <Image
+          src="/artwork/home/help-center-robot.png"
+          alt=""
+          width={160}
+          height={160}
+          className="help-center-robot"
+        />
         <SheetHeader className="px-6 py-5 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             {activeTab && (

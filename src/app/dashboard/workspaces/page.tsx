@@ -1,9 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/clerk-auth";
 import { getAccessContext } from "@/lib/access";
 import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   Tooltip,
   TooltipContent,
@@ -55,35 +57,46 @@ export default async function ManageWorkspacesPage() {
   const teamAdminBackHref = buildTeamAdminPath(defaultTeamForAdminLink.id, 0);
 
   return (
-    <div className="flex flex-1 flex-col gap-8 p-4 sm:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0 space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Manage workspaces</h1>
-          <p className="text-muted-foreground text-sm sm:text-base max-w-2xl">
-            Add, rename, or delete team workspaces you own. History below lists creates, renames, and
-            deletes.
-          </p>
+    <div className="manage-workspaces-page flex flex-1 flex-col gap-6 p-4 sm:p-8">
+      <Card className="manage-workspaces-card manage-workspaces-hero shadow-none ring-0">
+        <div className="manage-workspaces-hero-header">
+          <div className="min-w-0 space-y-2">
+            <h1>Manage workspaces</h1>
+            <p>
+              Add, rename, or delete team workspaces you own. History below lists creates, renames,
+              and deletes.
+            </p>
+          </div>
+          <div className="manage-workspaces-hero-tools">
+            <Image
+              src="/artwork/home/workspace-robot.png"
+              alt=""
+              width={320}
+              height={320}
+              className="manage-workspaces-robot"
+            />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Link
+                      href={teamAdminBackHref}
+                      className={cn(
+                        buttonVariants({ variant: "outline" }),
+                        "manage-workspaces-back w-full gap-2 sm:w-auto shrink-0",
+                      )}
+                    />
+                  }
+                >
+                  <ArrowLeft className="size-4" aria-hidden />
+                  Back To Team Dashboard
+                </TooltipTrigger>
+                <TooltipContent>Return to the team admin dashboard</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Link
-                  href={teamAdminBackHref}
-                  className={cn(
-                    buttonVariants({ variant: "outline" }),
-                    "w-full gap-2 sm:w-auto shrink-0",
-                  )}
-                />
-              }
-            >
-              <ArrowLeft className="size-4" aria-hidden />
-              Back To Team Dashboard
-            </TooltipTrigger>
-            <TooltipContent>Return to the team admin dashboard</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+      </Card>
 
       <ManageWorkspacesPanel
         teams={ownedTeams.map((t) => ({

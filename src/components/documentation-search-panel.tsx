@@ -19,6 +19,7 @@ type DocumentationSearchPanelProps = {
   onNavigate: (targetHash: string) => void;
   className?: string;
   placeholder?: string;
+  showSearchButton?: boolean;
 };
 
 function HitKindBadge({ kind }: { kind: DocumentationSearchHit["kind"] }) {
@@ -47,6 +48,7 @@ export function DocumentationSearchPanel({
   onNavigate,
   className,
   placeholder = "Search screens, features, routes, and guides…",
+  showSearchButton = false,
 }: DocumentationSearchPanelProps) {
   const [query, setQuery] = useState("");
 
@@ -74,30 +76,37 @@ export function DocumentationSearchPanel({
 
   return (
     <div className={cn("space-y-3", className)}>
-      <div className="relative">
-        <Search
-        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-cyan-600 dark:text-cyan-300"
-          aria-hidden
-        />
-        <Input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          aria-label="Search documentation"
-          className="h-11 border-cyan-400/30 bg-card/70 pl-9 pr-10 text-sm shadow-sm shadow-cyan-500/10 backdrop-blur-sm focus-visible:border-cyan-400/60"
-        />
-        {query ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="absolute right-1 top-1/2 size-8 -translate-y-1/2 text-muted-foreground"
-            onClick={() => setQuery("")}
-            aria-label="Clear search"
-          >
-            <X className="size-4" aria-hidden />
+      <div className={cn(showSearchButton && "docs-search-row")}>
+        <div className="relative min-w-0 flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-violet-600 dark:text-violet-200"
+            aria-hidden
+          />
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            aria-label="Search documentation"
+            className="h-11 border-violet-300/40 bg-card pl-9 pr-10 text-sm shadow-sm focus-visible:border-violet-400"
+          />
+          {query ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 size-8 -translate-y-1/2 text-muted-foreground"
+              onClick={() => setQuery("")}
+              aria-label="Clear search"
+            >
+              <X className="size-4" aria-hidden />
+            </Button>
+          ) : null}
+        </div>
+        {showSearchButton ? (
+          <Button type="button" className="docs-search-btn shrink-0">
+            Search
           </Button>
         ) : null}
       </div>
