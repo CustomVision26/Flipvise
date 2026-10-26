@@ -23,6 +23,7 @@ import {
   Minimize2,
   MousePointerClick,
   PencilLine,
+  Search,
   Shrink,
   Sparkles,
   UserPlus,
@@ -53,8 +54,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { searchDocsUiGuides } from "@/lib/flipvise-ui-guide-search";
 import { cn } from "@/lib/utils";
 import {
   DOCS_UI_GUIDE_CATEGORIES,
@@ -621,6 +624,12 @@ export function DocsUiGuidesMenuButton({
 }) {
   const guide = useDocsUiGuide();
   const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState("");
+  const matches = React.useMemo(() => searchDocsUiGuides(query), [query]);
+  const matchRank = React.useMemo(() => {
+    if (!matches) return null;
+    return new Map(matches.map((id, index) => [id, index]));
+  }, [matches]);
   if (!guide) return null;
 
   const openCatalogGuide = (id: DocsUiGuideId) => {
@@ -628,8 +637,47 @@ export function DocsUiGuidesMenuButton({
     guide.openGuide(id);
   };
 
+  const visibleIds = (ids: readonly DocsUiGuideId[]) => {
+    if (!matchRank) return ids;
+    return [...ids]
+      .filter((id) => matchRank.has(id))
+      .sort((a, b) => (matchRank.get(a) ?? 0) - (matchRank.get(b) ?? 0));
+  };
+
+  const visibleCategories = DOCS_UI_GUIDE_CATEGORIES.map((category) => {
+    const guideIds = visibleIds(category.guideIds);
+    const nested = category.nested
+      ?.map((group) => ({ ...group, guideIds: visibleIds(group.guideIds) }))
+      .filter((group) => group.guideIds.length > 0);
+    return { ...category, guideIds, nested };
+  })
+    .filter(
+      (category) =>
+        category.guideIds.length > 0 || (category.nested?.length ?? 0) > 0,
+    )
+    .sort((a, b) => {
+      if (!matchRank) return 0;
+      const best = (ids: readonly DocsUiGuideId[]) =>
+        ids.reduce((rank, id) => Math.min(rank, matchRank.get(id) ?? rank), 999);
+      const aIds = [
+        ...a.guideIds,
+        ...(a.nested?.flatMap((group) => group.guideIds) ?? []),
+      ];
+      const bIds = [
+        ...b.guideIds,
+        ...(b.nested?.flatMap((group) => group.guideIds) ?? []),
+      ];
+      return best(aIds) - best(bIds);
+    });
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setQuery("");
+      }}
+    >
       <DialogTrigger
         render={
           <Button
@@ -708,14 +756,58 @@ export function DocsUiGuidesMenuButton({
             </div>
           </DialogHeader>
         </div>
+        <div className="relative z-10 border-b border-violet-300/40 px-6 py-4 sm:px-8">
+          <label className="grid gap-2" htmlFor="ui-guides-search">
+            <span className="ui-guides-search-label text-sm font-medium">Find a guide</span>
+            <span className="relative block">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-violet-700 dark:text-violet-200"
+                aria-hidden
+              />
+              <Input
+                id="ui-guides-search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="How to add a new deck"
+                className="ui-guides-search h-11 pr-10 pl-10 text-base"
+                autoComplete="off"
+              />
+              {query ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="ui-guides-search-clear absolute top-1/2 right-1 size-8 -translate-y-1/2"
+                  aria-label="Clear guide search"
+                  onClick={() => setQuery("")}
+                >
+                  <X className="size-4" aria-hidden />
+                </Button>
+              ) : null}
+            </span>
+          </label>
+          {matches ? (
+            <p className="ui-guides-search-hint mt-2 text-sm">
+              {matches.length === 0
+                ? "No guide matches that question. Try the task in a few words, such as add a deck or sign in."
+                : `${matches.length} ${matches.length === 1 ? "guide matches" : "guides match"} this question.`}
+            </p>
+          ) : (
+            <p className="ui-guides-search-hint mt-2 text-sm">
+              Ask what you want to do. The catalog keeps the guides that explain that task.
+            </p>
+          )}
+        </div>
         <ScrollArea className="h-[min(76vh,50rem)]">
           <div className="px-6 py-5 sm:px-8 sm:py-6">
+            {matches && matches.length === 0 ? null : (
             <Accordion
+              key={matches?.join("|") ?? "catalog"}
               multiple
-              defaultValue={DOCS_UI_GUIDE_CATEGORIES.map((category) => category.id)}
+              defaultValue={visibleCategories.map((category) => category.id)}
               className="gap-0"
             >
-              {DOCS_UI_GUIDE_CATEGORIES.map((category) => {
+              {visibleCategories.map((category) => {
                 const Icon = CATEGORY_ICONS[category.id];
                 const accent = CATEGORY_ACCENTS[category.id];
                 const nestedCount =
@@ -758,6 +850,7 @@ export function DocsUiGuidesMenuButton({
                       </span>
                     </AccordionTrigger>
                     <AccordionContent className="px-1 pb-6">
+                      {category.guideIds.length > 0 ? (
                       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         {category.guideIds.map((id, index) => (
                           <DocsUiGuideCatalogItem
@@ -769,6 +862,7 @@ export function DocsUiGuidesMenuButton({
                           />
                         ))}
                       </div>
+                      ) : null}
                       {category.nested?.map((group) => (
                         <Card
                           key={group.id}
@@ -830,6 +924,7 @@ export function DocsUiGuidesMenuButton({
                 );
               })}
             </Accordion>
+            )}
           </div>
         </ScrollArea>
       </DialogContent>

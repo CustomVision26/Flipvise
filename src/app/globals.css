@@ -6720,7 +6720,7 @@ html.dark[data-artwork-ready="true"] .team-admin-surface {
   color: #e9d5ff !important;
 }
 
-.dark .team-admin-surface .bg-white :is(
+.dark .team-admin-surface .bg-white:not(.team-admin-metric) :is(
   label,
   [data-slot="label"],
   p,
@@ -6739,9 +6739,41 @@ html.dark[data-artwork-ready="true"] .team-admin-surface {
   color: #5b21b6 !important;
 }
 
-.dark .team-admin-surface .team-admin-metric {
+.dark .team-admin-surface .team-admin-metric,
+html.dark .team-admin-surface .team-admin-metric {
   background-color: #261f45 !important;
   border-color: rgb(196 181 253 / 0.24) !important;
+  color: #f8fafc !important;
+}
+
+.team-admin-surface .team-admin-metric {
+  min-width: 0;
+}
+
+.team-admin-surface .team-admin-metric p,
+.team-admin-surface .team-admin-metric span {
+  overflow-wrap: anywhere;
+}
+
+.dark .team-admin-surface .team-admin-metric :is(p, span),
+html.dark .team-admin-surface .team-admin-metric :is(p, span) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+.dark .team-admin-surface .team-admin-metric :is(.text-slate-500, .text-slate-400),
+html.dark .team-admin-surface .team-admin-metric :is(.text-slate-500, .text-slate-400) {
+  color: #ddd6fe !important;
+  -webkit-text-fill-color: #ddd6fe !important;
+}
+
+.team-admin-surface .team-admin-metric [data-slot="progress"] {
+  background: #ede9fe !important;
+}
+
+.dark .team-admin-surface .team-admin-metric [data-slot="progress"],
+html.dark .team-admin-surface .team-admin-metric [data-slot="progress"] {
+  background: #3b2f6b !important;
 }
 
 .dark .team-admin-surface [class*="border-stone-200"] {
@@ -7460,6 +7492,49 @@ html.dark .ui-guides-dialog [data-slot="dialog-description"] {
   -webkit-text-fill-color: #1e1b4b !important;
 }
 html.dark .ui-guides-dialog [data-slot="dialog-title"] {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+.ui-guides-dialog .ui-guides-search-label,
+.ui-guides-dialog .ui-guides-search-hint {
+  color: #5b21b6 !important;
+  -webkit-text-fill-color: #5b21b6 !important;
+}
+html.dark .ui-guides-dialog .ui-guides-search-label,
+html.dark .ui-guides-dialog .ui-guides-search-hint {
+  color: #ddd6fe !important;
+  -webkit-text-fill-color: #ddd6fe !important;
+}
+.ui-guides-dialog .ui-guides-search {
+  background: #ffffff !important;
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+  border: 1px solid #c4b5fd !important;
+  border-radius: 999px !important;
+  min-height: 2.75rem;
+  font-size: 1rem !important;
+}
+html.dark .ui-guides-dialog .ui-guides-search {
+  background: #1b1148 !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  border-color: #7c3aed !important;
+}
+.ui-guides-dialog .ui-guides-search::placeholder {
+  color: #7c3aed !important;
+  -webkit-text-fill-color: #7c3aed !important;
+  opacity: 1;
+}
+html.dark .ui-guides-dialog .ui-guides-search::placeholder {
+  color: #c4b5fd !important;
+  -webkit-text-fill-color: #c4b5fd !important;
+}
+.ui-guides-dialog .ui-guides-search-clear {
+  color: #5b21b6 !important;
+  -webkit-text-fill-color: #5b21b6 !important;
+  background: transparent !important;
+}
+html.dark .ui-guides-dialog .ui-guides-search-clear {
   color: #f8fafc !important;
   -webkit-text-fill-color: #f8fafc !important;
 }
@@ -10272,6 +10347,42 @@ html.dark .library-dialog button[data-variant="default"] :is(svg) {
   .library-hero-copy {
     flex-wrap: wrap;
   }
+}
+
+.team-admin-surface [data-slot="table-container"] {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.team-admin-surface [data-slot="table"] {
+  min-width: 52rem;
+}
+
+.team-admin-surface [data-slot="table"] [data-slot="select-trigger"] {
+  min-width: 9.5rem;
+  max-width: 100%;
+}
+
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
+  max-width: min(
+    100%,
+    calc(100vw - 1.25rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))
+  );
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1rem);
+}
+
+[data-slot="sheet-content"] {
+  max-height: 100dvh;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+
+[data-slot="table-container"] {
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .team-admin-surface [data-slot="progress-indicator"] {
