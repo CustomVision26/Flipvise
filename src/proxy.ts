@@ -50,6 +50,7 @@ export default async function proxy(
 ) {
   try {
     const response = await clerk(request, event);
+    if (!(response instanceof Response)) return response;
     return keepRewriteOnRequestOrigin(request, response);
   } catch (error) {
     if (isStaleOrMissingSessionError(error)) {
