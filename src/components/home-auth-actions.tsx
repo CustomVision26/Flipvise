@@ -3,7 +3,7 @@
 import { useAuth } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { WifiOff } from "lucide-react";
+import { ArrowRight, UserPlus, WifiOff } from "lucide-react";
 import { SignInBtn, SignUpBtn } from "@/components/auth-buttons";
 import { HomeInviteEmailAuthButtons } from "@/components/home-invite-email-auth-buttons";
 import { NativeAppBackButton } from "@/components/native-app-back-button";
@@ -67,8 +67,14 @@ export function HomeAuthActions({
         )}
         aria-hidden={isHomeRedirecting}
       >
-        <SignInBtn size="lg" />
-        <SignUpBtn size="lg" />
+        <SignUpBtn size="lg" className="home-auth-signup">
+          <UserPlus className="size-4" aria-hidden />
+          Sign Up
+        </SignUpBtn>
+        <SignInBtn size="lg" className="home-auth-signin">
+          <ArrowRight className="size-4" aria-hidden />
+          Sign In
+        </SignInBtn>
       </div>
     </div>
   );

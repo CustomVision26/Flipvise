@@ -257,20 +257,27 @@ export function IllustratedQuizPrepFrame({
   const { effectiveIllustratedDesign, effectiveReducedMotion } =
     useIllustratedAppearance();
   if (!effectiveIllustratedDesign) return <>{children}</>;
-  if (active) {
-    return <div className="illustrated-quiz-live illustrated-readable">{children}</div>;
-  }
   return (
-    <div className="illustrated-quiz-prep relative mx-auto w-full max-w-3xl overflow-visible pt-8 pb-28 sm:pt-10 sm:pb-36">
+    <div
+      className={cn(
+        "illustrated-quiz-prep relative mx-auto w-full max-w-3xl overflow-visible",
+        active
+          ? "illustrated-quiz-live"
+          : "pt-8 pb-28 sm:pt-10 sm:pb-36",
+      )}
+    >
       <div className="relative overflow-visible">
         <div
           className={cn(
-            "pointer-events-none absolute left-0 top-0 z-20 hidden -translate-x-6 sm:block md:-translate-x-10",
+            "pointer-events-none absolute hidden sm:block",
+            active
+              ? "right-full top-2 z-0 mr-4"
+              : "left-0 top-0 z-20 -translate-x-6 md:-translate-x-10",
             !effectiveReducedMotion && "illustrated-quiz-props",
           )}
           aria-hidden
         >
-          <span className="relative block h-28 w-28 md:h-40 md:w-40">
+          <span className={cn("relative block", active ? "h-20 w-20 md:h-24 md:w-24" : "h-28 w-28 md:h-40 md:w-40")}>
             <IllustratedScene
               prop="quiz-stars"
               fit="contain"
@@ -280,10 +287,15 @@ export function IllustratedQuizPrepFrame({
           </span>
         </div>
         <div
-          className="pointer-events-none absolute right-0 top-0 z-20 hidden translate-x-4 sm:block md:translate-x-8"
+          className={cn(
+            "pointer-events-none absolute hidden sm:block",
+            active
+              ? "left-full top-2 z-0 ml-4"
+              : "right-0 top-0 z-20 translate-x-4 md:translate-x-8",
+          )}
           aria-hidden
         >
-          <span className="relative block h-24 w-24 md:h-32 md:w-32">
+          <span className={cn("relative block", active ? "h-16 w-16 md:h-20 md:w-20" : "h-24 w-24 md:h-32 md:w-32")}>
             <IllustratedScene
               prop="quiz-stars"
               fit="contain"
@@ -294,12 +306,15 @@ export function IllustratedQuizPrepFrame({
         </div>
         <div
           className={cn(
-            "pointer-events-none absolute -left-6 bottom-10 z-20 hidden sm:block md:-left-16",
+            "pointer-events-none absolute hidden sm:block",
+            active
+              ? "right-full bottom-4 z-0 mr-3"
+              : "-left-6 bottom-10 z-20 md:-left-16",
             !effectiveReducedMotion && "illustrated-quiz-props",
           )}
           aria-hidden
         >
-          <span className="relative block h-52 w-44 md:h-64 md:w-56">
+          <span className={cn("relative block", active ? "h-36 w-32 md:h-44 md:w-36" : "h-52 w-44 md:h-64 md:w-56")}>
             <IllustratedScene
               prop="quiz-stopwatch"
               fit="contain"
@@ -309,10 +324,15 @@ export function IllustratedQuizPrepFrame({
           </span>
         </div>
         <div
-          className="pointer-events-none absolute -right-4 top-16 z-20 hidden sm:block md:-right-12"
+          className={cn(
+            "pointer-events-none absolute hidden sm:block",
+            active
+              ? "left-full top-24 z-0 ml-3"
+              : "-right-4 top-16 z-20 md:-right-12",
+          )}
           aria-hidden
         >
-          <span className="relative block h-56 w-48 md:h-72 md:w-60">
+          <span className={cn("relative block", active ? "h-40 w-36 md:h-48 md:w-40" : "h-56 w-48 md:h-72 md:w-60")}>
             <IllustratedScene
               prop="quiz-pencil"
               fit="contain"
@@ -334,12 +354,16 @@ export function IllustratedQuizPrepFrame({
             />
           </span>
         </div>
+        {active ? (
+          <div className="illustrated-readable relative z-10 isolate">{children}</div>
+        ) : (
         <IllustratedCardStack
           className="illustrated-stack-plain relative z-10"
           seed={`${deckName}-quiz`}
         >
           {children}
         </IllustratedCardStack>
+        )}
       </div>
     </div>
   );
@@ -397,7 +421,7 @@ export function IllustratedStudyOrbit({
         <div
           key={`${piece.slot}-${piece.prop}`}
           className={cn(
-            "illustrated-study-prop pointer-events-none absolute z-20 hidden lg:block",
+            "illustrated-study-prop pointer-events-none absolute z-20 hidden md:block",
             `illustrated-study-prop-${piece.slot}`,
           )}
           aria-hidden

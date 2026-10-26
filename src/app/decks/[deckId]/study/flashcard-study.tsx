@@ -112,10 +112,10 @@ export function FlashcardStudy({
   const reviewArt = resolveIllustratedArtwork({ name: deckName });
   const illustratedFace = effectiveIllustratedDesign;
   const faceChrome = illustratedFace
-    ? "illustrated-readable border border-[#eadfce] bg-[#fff8ee] text-slate-900"
+    ? "border-beam-pair illustrated-readable border border-[#eadfce] bg-[#fff8ee] text-slate-900"
     : hasGradient
-      ? cn(cardGradient.classes, "border border-white/20")
-      : "bg-card border";
+      ? cn(cardGradient.classes, "border-beam-pair border border-white/20")
+      : "border-beam-pair bg-card border";
   const [deck, setDeck] = useState<CardData[]>(cards);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
@@ -498,11 +498,7 @@ export function FlashcardStudy({
       >
       <div
         key={`${visibleIndex}-${enterFrom}`}
-        className={cn(
-          "relative",
-          !effectiveReducedMotion &&
-            (enterFrom === "prev" ? "animate-flashcard-enter-prev" : "animate-flashcard-enter"),
-        )}
+        className="relative"
         style={{ perspective: "1200px" }}
       >
       {effectiveIllustratedDesign ? (
@@ -553,6 +549,14 @@ export function FlashcardStudy({
               faceChrome,
             )}
           >
+            <div
+              key={`question-${visibleIndex}`}
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                !effectiveReducedMotion &&
+                  "animate-in fade-in slide-in-from-top-5 fill-mode-both duration-500",
+              )}
+            >
             <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0">
               <Badge variant="secondary" className={cn("text-xs", hasGradient && !illustratedFace && "bg-white/20 text-white border-white/30", illustratedFace && "bg-violet-100 text-violet-900")}>Front</Badge>
               <span className={cn("text-xs hidden sm:inline", illustratedFace ? "text-slate-600" : hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to reveal answer</span>
@@ -607,6 +611,7 @@ export function FlashcardStudy({
                 />
               )}
             </div>
+            </div>
           </div>
           ) : null}
 
@@ -626,6 +631,15 @@ export function FlashcardStudy({
               faceChrome,
             )}
           >
+            <div
+              key={`answer-${visibleIndex}-${isFlipped ? "show" : "hide"}`}
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                isFlipped &&
+                  !effectiveReducedMotion &&
+                  "animate-in fade-in slide-in-from-bottom-5 fill-mode-both delay-200 duration-500",
+              )}
+            >
             {isFlipped && !effectiveReducedMotion && !illustratedFace ? (
               <MagicAnswerAmbience revealKey={answerRevealKey} />
             ) : null}
@@ -671,6 +685,7 @@ export function FlashcardStudy({
                   revealKey={answerRevealKey}
                 />
               )}
+            </div>
             </div>
           </div>
           ) : null}

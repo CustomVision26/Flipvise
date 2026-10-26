@@ -24,14 +24,47 @@ import { OfflineBanner } from "@/components/offline-banner";
 import { useClientMounted } from "@/lib/use-client-mounted";
 import { ArtworkBackground } from "@/components/artwork-background";
 
-const clerkAppearance = {
-  theme: dark,
-  options: {
-    logoImageUrl: resolveLogoImageUrl(),
-    logoLinkUrl: "/",
-    logoPlacement: "inside" as const,
-  },
+const clerkLogo = {
+  logoImageUrl: resolveLogoImageUrl(),
+  logoLinkUrl: "/",
+  logoPlacement: "inside" as const,
 };
+
+const clerkLightVariables = {
+  colorPrimary: "#7c3aed",
+  colorPrimaryForeground: "#ffffff",
+  colorBackground: "#fffaf3",
+  colorForeground: "#1e1b4b",
+  colorMutedForeground: "#5b21b6",
+  colorInput: "#ffffff",
+  colorInputForeground: "#1e1b4b",
+  colorBorder: "#c4b5fd",
+  colorRing: "#22d3ee",
+  colorNeutral: "#1e1b4b",
+  borderRadius: "1rem",
+};
+
+const clerkDarkVariables = {
+  colorPrimary: "#7c3aed",
+  colorPrimaryForeground: "#ffffff",
+  colorBackground: "#20124e",
+  colorForeground: "#f8fafc",
+  colorMutedForeground: "#ddd6fe",
+  colorInput: "#140c30",
+  colorInputForeground: "#f8fafc",
+  colorBorder: "#c4b5fd",
+  colorRing: "#22d3ee",
+  colorNeutral: "#e9d5ff",
+  borderRadius: "1rem",
+};
+
+function clerkAppearance(mode: "light" | "dark") {
+  return {
+    ...(mode === "dark" ? { theme: dark } : {}),
+    variables: mode === "dark" ? clerkDarkVariables : clerkLightVariables,
+    options: clerkLogo,
+  };
+}
 
 /** Drop legacy `system` from localStorage so only light | dark are used. */
 function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
@@ -47,9 +80,13 @@ function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
 }
 
 function ClerkWithTheme({ children }: { children: React.ReactNode }) {
+  const { resolvedTheme } = useTheme();
+  const mounted = useClientMounted();
+  const mode = mounted && resolvedTheme === "light" ? "light" : "dark";
+
   return (
     <ClerkProvider
-      appearance={clerkAppearance}
+      appearance={clerkAppearance(mode)}
       telemetry={false}
       signUpUrl={flipviseSignUpUrl()}
     >

@@ -608,7 +608,7 @@ export function QuizStudy({
   const canStartQuiz = canStartSecuredQuiz && !scheduleBlocksStart;
 
   const [result, setResult] = useState<QuizResult | null>(null);
-  const { effectiveIllustratedDesign } = useIllustratedAppearance();
+  const { effectiveIllustratedDesign, effectiveReducedMotion } = useIllustratedAppearance();
   useDeckScreen(result ? "results" : quizStarted ? "quiz-live" : "prep");
   const [submitting, startTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -1774,11 +1774,15 @@ export function QuizStudy({
       <IllustratedPeekFrame
         key={current.cardId}
         seed={current.cardId}
-        className="w-full animate-flashcard-enter"
+        className={cn(
+          "w-full",
+          !effectiveReducedMotion &&
+            "animate-in fade-in slide-in-from-top-5 fill-mode-both duration-500",
+        )}
       >
       <div
         className={cn(
-          "w-full rounded-xl sm:rounded-2xl border shadow-md overflow-hidden",
+          "border-beam-pair w-full rounded-xl sm:rounded-2xl border shadow-md overflow-hidden",
           effectiveIllustratedDesign
             ? "border-[#eadfce] bg-[#fff8ee] text-slate-900"
             : deckAccent.hasDeckAccent
@@ -1856,6 +1860,8 @@ export function QuizStudy({
                     onChange={(e) => handleTypedAnswer(e.target.value)}
                     className={cn(
                       "inline-flex h-10 min-w-[7rem] max-w-[12rem] sm:max-w-xs text-center font-semibold",
+                      !effectiveReducedMotion &&
+                        "animate-in fade-in slide-in-from-bottom-5 fill-mode-both delay-200 duration-500",
                       deckAccent.hasDeckAccent &&
                         "border-white/40 bg-white/10 text-white placeholder:text-white/50",
                     )}
@@ -1893,7 +1899,12 @@ export function QuizStudy({
 
       {current.type !== "fill_in_blank" ? (
       <div
-        className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4"
+        key={`answers-${current.cardId}`}
+        className={cn(
+          "grid w-full grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4",
+          !effectiveReducedMotion &&
+            "animate-in fade-in slide-in-from-bottom-5 fill-mode-both delay-200 duration-500",
+        )}
         role="radiogroup"
         aria-label="Answer options"
       >
@@ -2106,6 +2117,45 @@ function QuizResultCard({
 }) {
   const { percent, correct, incorrect, unanswered, total, tier, quote, elapsedSeconds, timedOut } =
     result;
+  const { effectiveReducedMotion } = useIllustratedAppearance();
+
+  useEffect(() => {
+    if (percent <= 90 || effectiveReducedMotion) return;
+    let cancelled = false;
+    let frame = 0;
+    const end = Date.now() + 3000;
+    const colors = ["#a786ff", "#fd8bbc", "#eca184", "#f8deb1"];
+    void import("canvas-confetti").then(({ default: confetti }) => {
+      if (cancelled) return;
+      const tick = () => {
+        if (cancelled || Date.now() > end) return;
+        void confetti({
+          particleCount: 2,
+          angle: 60,
+          spread: 55,
+          startVelocity: 60,
+          origin: { x: 0, y: 0.5 },
+          colors,
+          zIndex: 9999,
+        });
+        void confetti({
+          particleCount: 2,
+          angle: 120,
+          spread: 55,
+          startVelocity: 60,
+          origin: { x: 1, y: 0.5 },
+          colors,
+          zIndex: 9999,
+        });
+        frame = requestAnimationFrame(tick);
+      };
+      frame = requestAnimationFrame(tick);
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [percent, effectiveReducedMotion]);
 
   const resultAccent = useMemo(() => getDeckQuizAccent(deckGradient), [deckGradient]);
   const resultAccentCss =
@@ -2186,7 +2236,7 @@ function QuizResultCard({
     >
       <IllustratedPeekFrame seed={`${deckName}-quiz-result`} className="w-full max-w-xl">
       <div
-        className={`w-full flex flex-col items-center gap-4 sm:gap-6 rounded-xl sm:rounded-2xl border bg-gradient-to-b ${style.accent} bg-card p-6 sm:p-10 shadow-md text-center`}
+        className={`border-beam-pair relative w-full flex flex-col items-center gap-4 sm:gap-6 overflow-hidden rounded-xl sm:rounded-2xl border bg-gradient-to-b ${style.accent} bg-card p-6 sm:p-10 shadow-md text-center`}
       >
         <div className="flex flex-col items-center gap-2">
           <Icon className={`h-10 w-10 sm:h-12 sm:w-12 ${style.color}`} />

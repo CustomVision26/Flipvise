@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth, useSignUp } from "@clerk/nextjs";
 import { ChevronRight, Eye, EyeOff, Loader2, Pencil, ShieldAlert } from "lucide-react";
@@ -65,7 +66,7 @@ function SignUpResendCodeControl({
   }
 
   return (
-    <p className="text-center text-sm text-muted-foreground" aria-live="polite">
+    <p className="signup-dialog-resend text-center text-sm" aria-live="polite">
       Didn’t receive a code?{" "}
       {secondsLeft > 0 ? (
         <span>Resend ({secondsLeft})</span>
@@ -74,7 +75,7 @@ function SignUpResendCodeControl({
           type="button"
           variant="link"
           size="sm"
-          className="h-auto px-0 text-foreground"
+          className="signup-dialog-resend-action h-auto px-0"
           disabled={resending || disabled}
           onClick={() => {
             void handleResend();
@@ -133,14 +134,14 @@ function PasswordField({
           value={value}
           disabled={disabled}
           required
-          className="pr-10"
+          className="pr-12"
           onChange={(event) => onChange(event.target.value)}
         />
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="absolute top-0 right-0 size-8 text-muted-foreground hover:text-foreground"
+          className="signup-dialog-eye absolute top-1/2 right-1 size-8 -translate-y-1/2"
           disabled={disabled}
           aria-label={visible ? "Hide password" : "Show password"}
           onClick={() => setVisible((current) => !current)}
@@ -320,16 +321,24 @@ export function SignUpDialog({
       ) : null}
       <DialogContent
         className={cn(
-          "max-h-[min(90vh,820px)] overflow-y-auto",
-          step === "code" ? "sm:max-w-sm" : "sm:max-w-lg",
+          "signup-dialog max-h-[min(90vh,820px)]",
+          step === "code" ? "signup-dialog-code overflow-visible sm:max-w-md" : "overflow-y-auto sm:max-w-lg",
         )}
       >
         <DialogHeader className={step === "code" ? "items-center text-center" : undefined}>
           {step === "code" ? (
             <>
+              <Image
+                src="/artwork/home/signup-mail-owl.png"
+                alt=""
+                width={280}
+                height={280}
+                className="signup-dialog-mail-owl"
+                unoptimized
+              />
               <DialogTitle>Check your email</DialogTitle>
-              <DialogDescription>to continue to Flipvise</DialogDescription>
-              <div className="flex items-center justify-center gap-1 text-sm font-medium text-foreground">
+              <DialogDescription>to continue to Flipvise.</DialogDescription>
+              <div className="signup-dialog-email flex items-center justify-center gap-1 text-sm font-medium">
                 <span className="truncate">{email}</span>
                 <Button
                   type="button"
@@ -344,13 +353,23 @@ export function SignUpDialog({
               </div>
             </>
           ) : (
-            <>
-              <DialogTitle>Create your account</DialogTitle>
-              <DialogDescription>
-                Welcome! Enter your name, email, and password. After verification you’ll complete
-                contact details and security questions.
-              </DialogDescription>
-            </>
+            <div className="signup-dialog-intro">
+              <div className="flex min-w-0 flex-col gap-2">
+                <DialogTitle>Create your account</DialogTitle>
+                <DialogDescription>
+                  Welcome! Enter your name, email, and password. After verification you’ll complete
+                  contact details and security questions.
+                </DialogDescription>
+              </div>
+              <Image
+                src="/artwork/home/signup-owl.png"
+                alt=""
+                width={220}
+                height={220}
+                className="signup-dialog-owl"
+                unoptimized
+              />
+            </div>
           )}
         </DialogHeader>
 
@@ -429,7 +448,7 @@ export function SignUpDialog({
 
             <div id="clerk-captcha" />
 
-            <Button type="submit" disabled={busy || !isLoaded} className="mt-1 w-full">
+            <Button type="submit" disabled={busy || !isLoaded} className="signup-dialog-continue mt-1 w-full">
               {busy ? (
                 <>
                   <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -439,7 +458,7 @@ export function SignUpDialog({
                 "Continue"
               )}
             </Button>
-            <p className="text-center text-xs leading-relaxed text-muted-foreground">
+            <p className="signup-dialog-legal text-center text-xs leading-relaxed">
               Creating an account means you agree to the{" "}
               <Link href="/terms" className="text-primary underline-offset-4 hover:underline">
                 Terms of Service
@@ -457,7 +476,7 @@ export function SignUpDialog({
               event.preventDefault();
               void verifyWithCode(code);
             }}
-            className="flex flex-col items-center gap-4"
+            className="signup-dialog-code-form flex flex-col items-center gap-4"
           >
             <InputOTP
               id="signup-verification-code"
@@ -479,7 +498,7 @@ export function SignUpDialog({
                 }
               }}
             >
-              <InputOTPGroup>
+              <InputOTPGroup className="signup-dialog-code-slots">
                 {Array.from({ length: VERIFICATION_CODE_LENGTH }, (_, index) => (
                   <InputOTPSlot
                     key={index}
@@ -495,7 +514,7 @@ export function SignUpDialog({
             />
             <Button
               type="submit"
-              className="w-full"
+              className="signup-dialog-continue w-full"
               disabled={busy || code.length < VERIFICATION_CODE_LENGTH}
             >
               {busy ? (
@@ -514,6 +533,7 @@ export function SignUpDialog({
               type="button"
               variant="ghost"
               size="sm"
+              className="signup-dialog-alt"
               disabled={busy}
               onClick={backToDetails}
             >

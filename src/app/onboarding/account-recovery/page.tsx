@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { createClerkClient } from "@clerk/backend";
-import { Shield } from "lucide-react";
 import { getAccessContext } from "@/lib/access";
 import { AccountRecoveryOnboardingForm } from "@/components/account-recovery-onboarding-form";
 import {
@@ -71,25 +70,8 @@ export default async function AccountRecoveryOnboardingPage({
       : requestedPath;
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-start gap-8 p-4 pt-10 sm:p-8 sm:pt-14">
-      <div className="flex w-full max-w-lg flex-col items-center gap-7">
-        <div className="flex flex-col items-center gap-3.5 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border/70 bg-muted/40">
-            <Shield className="h-5 w-5 text-foreground/80" aria-hidden />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Complete your account details
-            </h1>
-            <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-              Complete three short steps: contact details, account type, and
-              security questions. This helps verify your identity if you lose
-              access.
-            </p>
-          </div>
-        </div>
-        <AccountRecoveryOnboardingForm redirectTo={continueAfterSave} />
-      </div>
+    <div className="account-recovery-page flex flex-1 flex-col items-center justify-start px-4 py-10 sm:px-6 sm:py-14">
+      <AccountRecoveryOnboardingForm redirectTo={continueAfterSave} />
     </div>
   );
 }

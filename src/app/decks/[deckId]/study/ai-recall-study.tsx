@@ -135,7 +135,7 @@ export function AiRecallStudy({
 }: AiRecallStudyProps) {
   const cardGradient = getGradientBySlug(deckGradient);
   const hasGradient = cardGradient.slug !== "none";
-  const { effectiveIllustratedDesign } = useIllustratedAppearance();
+  const { effectiveIllustratedDesign, effectiveReducedMotion } = useIllustratedAppearance();
   const recallArt = resolveIllustratedArtwork({
     name: deckName,
     description: deckDescription,
@@ -779,6 +779,7 @@ export function AiRecallStudy({
   const showAnswer = phase === "revealed" || phase === "unlocking";
 
   return (
+    <IllustratedStudyOrbit variant="recall" motionKey={current.id} className="mx-auto w-full max-w-3xl">
     <div className="mx-auto flex w-full flex-1 flex-col gap-4 sm:gap-5">
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
@@ -844,11 +845,15 @@ export function AiRecallStudy({
       <IllustratedPeekFrame
         key={current.id}
         seed={current.id}
-        className="w-full animate-flashcard-enter"
+        className={cn(
+          "w-full",
+          !effectiveReducedMotion &&
+            "animate-in fade-in slide-in-from-top-5 fill-mode-both duration-500",
+        )}
       >
       <div
         className={cn(
-          "relative z-[1] flex min-h-[220px] flex-col overflow-hidden rounded-2xl border shadow-sm sm:min-h-[280px]",
+          "border-beam-pair relative z-[1] flex min-h-[220px] flex-col overflow-hidden rounded-2xl border shadow-sm sm:min-h-[280px]",
           effectiveIllustratedDesign
             ? "illustrated-readable border-[#eadfce] bg-[#fff8ee] text-slate-900"
             : hasGradient
@@ -1146,7 +1151,14 @@ export function AiRecallStudy({
       ) : null}
 
       {showAnswer ? (
-        <div className="flex flex-col gap-4 rounded-xl border border-border bg-card/60 p-4 sm:p-5">
+        <div
+          key={answerRevealKey}
+          className={cn(
+            "flex flex-col gap-4 rounded-xl border border-border bg-card/60 p-4 sm:p-5",
+            !effectiveReducedMotion &&
+              "animate-in fade-in slide-in-from-bottom-5 fill-mode-both delay-200 duration-500",
+          )}
+        >
           {outcome === "correct" ? (
             <div className="space-y-1">
               <p className="text-lg font-semibold text-emerald-500">
@@ -1258,6 +1270,7 @@ export function AiRecallStudy({
         />
       ) : null}
     </div>
+    </IllustratedStudyOrbit>
   );
 }
 

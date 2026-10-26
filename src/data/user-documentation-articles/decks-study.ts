@@ -92,7 +92,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         id: "modes",
         title: "Study modes",
         bullets: [
-          "Study Mode selector at the top: Standard Review, AI Recall™, and Quiz (when available). Your last selected mode is remembered. A deck cover image is not a flashcard and is not included in study or quiz. Illustrated Deck Design adds subject artwork without changing flip, recall, quiz timing, or Exam Mode. The study mode bar and the session panel are clear over the artwork, and the mode tabs plus Previous, Flip, and Next use a light surface. On a wide screen, Standard Review floats a card stack, headphones, and a lightbulb around the card, and AI Recall™’s ready screen floats a microphone, keyboard, and speech bubbles. Next and Previous replay a short 3D entrance on the card and its pictures.",
+          "Study Mode selector at the top: Standard Review, AI Recall™, and Quiz (when available). Your last selected mode is remembered. A deck cover image is not a flashcard and is not included in study or quiz. Illustrated Deck Design adds subject artwork without changing flip, recall, quiz timing, or Exam Mode. The study mode bar and the session panel are clear over the artwork, and the mode tabs plus Previous, Flip, and Next use a light surface. On a wide screen, Standard Review floats a card stack, headphones, and a lightbulb around the card, and AI Recall™ floats a microphone, keyboard, and speech bubbles on the ready screen and beside the card. Next and Previous fade the question down from above. The answer fades up from below a moment later.",
           "Standard Review — flip cards to reveal answers, then Next. Works online and offline (browser PWA / Capacitor). No Correct/Incorrect self-grading.",
           "Double-click the front or back image on a flashcard to open a full-size preview; Escape or click outside closes it.",
           "AI Recall™ — answer first (type, voice, or draw) before the solution unlocks; AI evaluates understanding, then Continue or Review Again. Requires Pro Plus / Education Plus / team plans and an internet connection.",
@@ -157,7 +157,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         id: "quiz-results-review",
         title: "Quiz results review",
         bullets: [
-          "After you submit a quiz, the Review section labels each question with its format: Question N (MCQ), (True/False), or (Fill in the blank). Open quiz results for a workspace guide to follow Team Admin Quiz results through the member’s saved score and Review.",
+          "After you submit a quiz, the Review section labels each question with its format: Question N (MCQ), (True/False), or (Fill in the blank). A score over 90% shoots confetti in from both sides of the results screen. Two light beams travel around cards, dialogs, and study panels. Reduced motion skips both. Open quiz results for a workspace guide to follow Team Admin Quiz results through the member’s saved score and Review.",
           "Saved results in your inbox and on /dashboard/quiz-results/[id] show the same format labels.",
           "PDF exports include the format on each question line when the result was saved with format metadata.",
         ],

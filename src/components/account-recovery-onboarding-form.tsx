@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { saveAccountRecoveryProfileAction } from "@/actions/account-recovery-profile";
 import { AccountRecoveryFields } from "@/components/account-recovery-fields";
@@ -86,13 +87,21 @@ export function AccountRecoveryOnboardingForm({
   }
 
   return (
-    <Card className="w-full max-w-lg border-border/70 shadow-sm">
-      <CardHeader className="space-y-4 border-b border-border/60 pb-5">
+    <Card className="account-recovery-card relative w-full max-w-xl overflow-visible shadow-none ring-0">
+      <Image
+        src="/artwork/home/account-owl.png"
+        alt=""
+        width={240}
+        height={240}
+        className="account-recovery-owl"
+        unoptimized
+      />
+      <CardHeader className="account-recovery-header space-y-4 pb-2">
         <div className="space-y-2">
-          <CardTitle className="text-xl font-semibold tracking-tight">
+          <CardTitle className="account-recovery-title text-2xl font-bold tracking-tight">
             Account information
           </CardTitle>
-          <CardDescription className="text-sm leading-relaxed">
+          <CardDescription className="account-recovery-copy text-sm leading-relaxed">
             Step {step} of {ACCOUNT_RECOVERY_FIELD_STEPS.length}:{" "}
             {stepMeta.heading}. Complete each slide to unlock your personal
             dashboard.
@@ -108,41 +117,22 @@ export function AccountRecoveryOnboardingForm({
                 <li key={entry.id} className="min-w-0">
                   <div
                     className={cn(
-                      "rounded-md border px-2 py-2 text-center",
-                      current
-                        ? "border-foreground/35 bg-muted/40"
-                        : complete
-                          ? "border-border/70 bg-muted/20"
-                          : "border-border/50 bg-transparent",
+                      "account-recovery-step px-2 py-2 text-center",
+                      current && "is-current",
+                      complete && "is-complete",
                     )}
                   >
-                    <p
-                      className={cn(
-                        "text-[10px] font-semibold uppercase tracking-[0.08em]",
-                        current ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    >
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em]">
                       Step {entry.id}
                     </p>
-                    <p
-                      className={cn(
-                        "truncate text-xs font-medium",
-                        current ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    >
-                      {entry.title}
-                    </p>
+                    <p className="truncate text-xs font-semibold">{entry.title}</p>
                   </div>
                 </li>
               );
             })}
           </ol>
-          <div
-            className="h-1 overflow-hidden rounded-full bg-muted"
-            aria-hidden
-          >
+          <div className="account-recovery-progress" aria-hidden>
             <div
-              className="h-full rounded-full bg-foreground/70 transition-all duration-300"
               style={{
                 width: `${(step / ACCOUNT_RECOVERY_FIELD_STEPS.length) * 100}%`,
               }}
@@ -154,7 +144,7 @@ export function AccountRecoveryOnboardingForm({
       <CardContent className="pt-6">
         <form onSubmit={onContinue} className="flex flex-col gap-6">
           <div className="space-y-1">
-            <h2 className="text-base font-semibold tracking-tight">
+            <h2 className="account-recovery-heading text-lg font-bold tracking-tight">
               {stepMeta.heading}
             </h2>
           </div>
@@ -174,17 +164,17 @@ export function AccountRecoveryOnboardingForm({
             step={step}
           />
 
-          <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-5 sm:flex-row sm:justify-between">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
             <Button
               type="button"
               variant="outline"
               disabled={busy || step <= 1}
               onClick={onBack}
-              className="h-10 w-full sm:w-auto"
+              className="account-recovery-back h-10 w-full sm:w-auto"
             >
               Back
             </Button>
-            <Button type="submit" disabled={busy} className="h-10 w-full sm:w-auto sm:min-w-40">
+            <Button type="submit" disabled={busy} className="account-recovery-continue h-10 w-full sm:w-auto sm:min-w-40">
               {busy ? (
                 <>
                   <Loader2 className="size-4 animate-spin" aria-hidden />
