@@ -1,14 +1,14 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-26T17:46:54.433Z",
+  "updatedAt": "2026-10-26T19:39:49.728Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "8cdb7100a87ad81dea8380cc985887a74744552af2ceb4a337f706a08d33f348",
       "docFingerprint": "69e563fada2b10858399dc791ae8a25a8babbcbf6ead53c0f9a629e4427dba45"
     },
     "header-navigation": {
-      "watchFingerprint": "3ddece0150a3ef2fc070939024f1fae6b0ea165636909b38c7679bbd33b98556",
-      "docFingerprint": "193e6772a305b6f9e11187acf27809768b5860e3b55526dd9d1ac8b603974097"
+      "watchFingerprint": "91a45c049afea47555787ff0767bd55da35073a1a488377ec9240a057d8caed9",
+      "docFingerprint": "62c9d5b8808aacd41f3df1ab9706fe9eaed1aa89aadfa4d42a260bf5d0b57207"
     },
     "personal-dashboard": {
       "watchFingerprint": "2a6e75799b395ddb4593c15df774e51b09a86817e48366aedaf30e419e932e05",
@@ -135,20 +135,20 @@
       "docFingerprint": "54d75d13000d8dc8f7e831a48b8c9cee51c145092c2ea84dd55e5db443ce8f8a"
     },
     "clerk-profile": {
-      "watchFingerprint": "b862a299dea22c7c6d5684bec05a2aaa3070ff9da07dd6ebc9d304e5539333f4",
-      "docFingerprint": "a665a3dd82ea05d66c64412704804bfed8403745256d4bad91dca3df9be1d561"
+      "watchFingerprint": "9232c3c4888389356437b4728f1a219cd12bf098cd2836dac3ed2b9fe3d1f63d",
+      "docFingerprint": "2d48d8e15482d598cfcab71d6f64f732807cc474a7a137b08effcf4574f55da3"
     },
     "account-details-settings": {
-      "watchFingerprint": "33c4359e711f010a90b46b8030a4865faefa66e86e907076894ef5aff210d2ef",
-      "docFingerprint": "39a1586b060422c44810d6feba28a4dde7d7e17a2a7aab951e97f2cf97701650"
+      "watchFingerprint": "0b397ca6427aacc77c3f9ef77f093cdd99b8e497ecf904edb78f97ebb730a870",
+      "docFingerprint": "73b881e606acafd46e666866e57b4f93976df8d07fd0591ea0e46057d495dcc3"
     },
     "appearance-settings": {
-      "watchFingerprint": "d651e4951fd2eb9d3c6e8c5ab7d946721881955e1fbd6ee3e2193c0ed741e236",
-      "docFingerprint": "75b5d0bbd3ca991c0fab5ff6daee1d67c2f3862d08e706b3221da5a87fb56298"
+      "watchFingerprint": "c7ca6c9d664283c577ebbcc9db0b731ebe7fda8ba6002b1b9eaa3142b18018f4",
+      "docFingerprint": "03ceef9aa35d3b93bb0c3891a35cd4506141045d269717a69c5925f39365b2eb"
     },
     "billing-tab": {
-      "watchFingerprint": "aa176e696c44384d614f3160c48a99bd577d51fa020fe4edbc01dc0e25fdeee3",
-      "docFingerprint": "5251de5e6932ba41341682b56fdc0329270a3547dd2196398f01f15ba19da159"
+      "watchFingerprint": "0dc84530e912fb5bc6c3449a9bf78ed4494cc3901498dbb5423ac358814d95d7",
+      "docFingerprint": "f93b0cb2e257f3056e47c4ed4e8f88e99c5f26003025a5654f5161a4502c4d62"
     },
     "account-delete": {
       "watchFingerprint": "8237211751a54516df3135926d8a3df9f9ab545d792cb386edad4d53d47297ab",
@@ -203,12 +203,12 @@
       "docFingerprint": "0325848a9c3641aa350e056cb65370115fee8f51c2ae042a1a9eb84574f8295b"
     },
     "teacher-dashboard": {
-      "watchFingerprint": "75b4c88a13c534b30f7f3c009c2485715825f8714554f7093840c224652c4a26",
-      "docFingerprint": "903196d306126a89f48d43c10e5f27ce1031a2d24d0b670181f2eb581ef9f0f1"
+      "watchFingerprint": "bef4f7b3abe3d146d191ea1e80d1fd9aae54440940ddebbb86f1cdf00e718a00",
+      "docFingerprint": "0863b2de4ee1e951962894003679c3bc4413b471e3a49c21faa5f42fe934a30c"
     },
     "teacher-ai-content-tools": {
-      "watchFingerprint": "ee852a32af802fba0a733116aec0ed2f15452946ca95f6465fb3453cf69fe8ff",
-      "docFingerprint": "6f89cda4f4cd252c9aaa20b55d131941719b36f898984d7d459d8b0411c2e7d8"
+      "watchFingerprint": "5aa14a58207447b4188a9357397960f3cb8b8aca2593e63d383b503b2e37da53",
+      "docFingerprint": "bc24de622c7ceb3961d73bfe80239705dbfeccd63e26064ae502113b3afb7ffb"
     },
     "teacher-classroom": {
       "watchFingerprint": "94696a981c9511be4c3fc2107e03fe3883d2d7e033f75b771a8694071059776c",

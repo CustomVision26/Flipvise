@@ -19,10 +19,7 @@ import { HelpCenterNavIconButton } from "@/components/help-center-nav-icon-butto
 import { TeacherNavIconButton } from "@/components/teacher-nav-icon-button";
 import { HeaderNavTooltip } from "@/components/header-nav-tooltip";
 import { DocsUiGuidesMenuButton } from "@/components/docs-ui-guide-provider";
-import {
-  shouldHidePlatformAdminNav,
-  shouldHideWorkspaceSwitcher,
-} from "@/lib/hide-platform-admin-nav";
+import { shouldHideWorkspaceSwitcher } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { clerkAuthHandoffDelayMs } from "@/lib/clerk-auth-handoff";
@@ -339,8 +336,6 @@ export function HeaderUserSection({
     return null;
   }
 
-  const hidePlatformAdminLink = shouldHidePlatformAdminNav(pathname);
-
   const isTeacherRoute =
     pathname === "/teacher" || pathname.startsWith("/teacher/");
   const isTeamAdminRoute =
@@ -441,7 +436,7 @@ export function HeaderUserSection({
                 title="Account — profile, account details, appearance, and billing"
               >
               <UserButton>
-                {isAdmin && !hidePlatformAdminLink ? (
+                {isAdmin ? (
                   <UserButton.MenuItems>
                     <UserButton.Link
                       label="Platform Admin"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,9 +73,16 @@ export function LessonPlanDayScopeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" showCloseButton>
+      <DialogContent className="quiz-scope-dialog sm:max-w-lg" showCloseButton>
+        <Image
+          src="/artwork/home/docs-owl.png"
+          alt=""
+          width={88}
+          height={88}
+          className="quiz-scope-owl"
+        />
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-1.5 pr-6">
+          <DialogTitle className="flex items-center gap-1.5 pr-24">
             <span>{title}</span>
             <TooltipProvider>
               <Tooltip>
@@ -107,7 +115,8 @@ export function LessonPlanDayScopeDialog({
             return (
               <div
                 key={option.value}
-                className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/10 px-3 py-2.5"
+                className="quiz-scope-option flex items-start gap-3 px-3 py-2.5"
+                data-active={selectedValue === option.value ? "true" : "false"}
               >
                 <RadioGroupItem
                   value={option.value}
@@ -145,7 +154,7 @@ export function LessonPlanDayScopeDialog({
           >
             Cancel
           </Button>
-          <Button type="button" onClick={handleConfirm}>
+          <Button type="button" className="quiz-scope-generate" onClick={handleConfirm}>
             {confirmLabel}
           </Button>
         </DialogFooter>

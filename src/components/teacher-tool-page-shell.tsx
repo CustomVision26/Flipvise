@@ -179,11 +179,15 @@ export function TeacherToolPageShell({
 
   useEffect(() => {
     if (!previewExpanded) return;
+    document.body.classList.add("teacher-preview-expanded");
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setPreviewExpanded(false);
     }
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.classList.remove("teacher-preview-expanded");
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [previewExpanded]);
 
   useLayoutEffect(() => {

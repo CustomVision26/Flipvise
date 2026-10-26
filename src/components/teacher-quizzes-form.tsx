@@ -947,7 +947,7 @@ export function TeacherQuizzesForm({
         ) : null
       }
       headerExtra={
-        <div className="flex flex-col items-end gap-1 text-right">
+        <div className="quiz-deck-quota flex flex-col items-end gap-1 text-right">
           <p className="text-xs font-medium text-muted-foreground">Decks</p>
           <Badge
             variant={deckQuota.atLimit ? "destructive" : "secondary"}
@@ -964,7 +964,7 @@ export function TeacherQuizzesForm({
       footer={
         <>
           <Separator className="bg-border/80" />
-          <Card className="border-border/80 bg-card/60">
+          <Card className="quiz-decks border-border/80 bg-card/60">
             <CardHeader className="pb-0">
               <Button
                 type="button"
@@ -1100,9 +1100,9 @@ export function TeacherQuizzesForm({
       }
     >
       <TooltipProvider>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="quiz-studio grid gap-4 sm:grid-cols-2">
           {isWorkspaceOwner ? (
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
               <TeacherFieldLabel
                 htmlFor="teamAdmin"
                 label="Workspace owner or team admin"
@@ -1143,7 +1143,7 @@ export function TeacherQuizzesForm({
           ) : null}
 
           {!isWorkspaceOwner || selectedAdminUserId !== ADMIN_NONE ? (
-          <div className="space-y-2 sm:col-span-2">
+          <div className="space-y-2">
             <TeacherFieldLabel
               htmlFor="quizDeckTargetMode"
               label="Quiz source"
@@ -1183,7 +1183,7 @@ export function TeacherQuizzesForm({
               }}
               variant="outline"
               spacing={0}
-              className="flex w-full"
+              className="quiz-source-toggle flex w-full"
               disabled={isBusy}
             >
               <ToggleGroupItem value="new" className="h-10 flex-1 px-3">
@@ -1389,7 +1389,7 @@ export function TeacherQuizzesForm({
             required
           />
         </div>
-        <div className="space-y-2 sm:col-span-2">
+        <div className="space-y-2">
           <TeacherFieldLabel
             htmlFor="topic"
             label="Topic"
@@ -1403,7 +1403,7 @@ export function TeacherQuizzesForm({
             required
           />
         </div>
-        <div className="space-y-2 sm:col-span-2">
+        <div className="space-y-2">
           <TeacherFieldLabel
             htmlFor="difficultyLevel"
             label="Difficulty Level"
@@ -1438,7 +1438,7 @@ export function TeacherQuizzesForm({
             </SelectContent>
             </Select>
         </div>
-        <div className="space-y-2 sm:col-span-2 sm:max-w-xs">
+        <div className="space-y-2 sm:max-w-xs">
           <TeacherFieldLabel
             htmlFor="numberOfCards"
             label={readingPassageQuestions ? "Regular quiz cards" : "Number of Cards"}
@@ -1504,7 +1504,7 @@ export function TeacherQuizzesForm({
         </div>
 
         <div className="space-y-2 sm:col-span-2">
-          <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/10 px-3 py-2.5">
+          <div className="quiz-passage-box flex items-start gap-2 px-3 py-2.5 sm:col-span-2">
             <Checkbox
               id="readingPassageQuestions"
               checked={readingPassageQuestions}
@@ -1550,7 +1550,7 @@ export function TeacherQuizzesForm({
                 correct answer + three distractors for quiz mode).
               </p>
               {readingPassageQuestions ? (
-                <div className="space-y-3">
+                <div className="quiz-passage-fields space-y-3">
                   <div className="space-y-1.5">
                     <TeacherFieldLabel
                       htmlFor="readingPassageCount"
@@ -1754,7 +1754,7 @@ export function TeacherQuizzesForm({
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="quiz-choice-card space-y-2">
                     <p className="text-sm font-medium text-foreground">Question types</p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {TEACHER_QUIZ_PASSAGE_QUESTION_TYPES.map((type) => {
@@ -1791,7 +1791,7 @@ export function TeacherQuizzesForm({
                     ) : null}
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="quiz-choice-card space-y-2">
                     <p className="text-sm font-medium text-foreground">Passage options</p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {(

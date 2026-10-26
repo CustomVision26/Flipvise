@@ -17,13 +17,18 @@ function storageKey(userId: string) {
   return `flipvise-illustrated-prompt:${userId}`;
 }
 
+function waitMs(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function clickAppearanceNav(): boolean {
   const buttons = document.querySelectorAll(
-    ".cl-navbarButton, .cl-userProfile-root button",
+    ".cl-navbarButton, .cl-userProfile-root button, .cl-userProfile-root a",
   );
   for (const button of buttons) {
     const text = button.textContent?.replace(/\s+/g, " ").trim();
-    if (text === "Appearance") {
+    const href = button.getAttribute("href") ?? "";
+    if (text === "Appearance" || href.includes("appearance")) {
       (button as HTMLElement).click();
       return true;
     }
@@ -66,12 +71,18 @@ export function IllustratedDesignPrompt() {
 
   async function openAppearance() {
     dismiss();
+    await appearance.refreshSettings();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (!document.querySelector(".illustrated-prompt-dialog")) break;
+      await waitMs(40);
+    }
+    await waitMs(180);
     const trigger = document.querySelector(
       "[data-header-account-menu] .cl-userButtonTrigger",
     );
     if (trigger instanceof HTMLElement) trigger.click();
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    for (let attempt = 0; attempt < 16; attempt += 1) {
+      await waitMs(70);
       const manage = document.querySelector(
         "[data-localization-key='userButton.action__manageAccount']",
       );
@@ -80,8 +91,8 @@ export function IllustratedDesignPrompt() {
         break;
       }
     }
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 60));
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      await waitMs(80);
       if (clickAppearanceNav()) return;
     }
   }

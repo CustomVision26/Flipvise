@@ -150,7 +150,7 @@ export function TeacherQuizReviewPanel({
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
+      <div className="quiz-review space-y-4">
         <div className="flex items-start gap-1.5">
           <p className="text-xs leading-relaxed text-muted-foreground">
             {mixedReview
@@ -191,10 +191,8 @@ export function TeacherQuizReviewPanel({
               key={row.id}
               style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
               className={cn(
-                "animate-in fade-in-0 slide-in-from-bottom-2 space-y-2 overflow-hidden rounded-xl border p-3 shadow-sm transition-all duration-200 fill-mode-both",
-                row.selected
-                  ? "border-violet-400/40 bg-gradient-to-br from-violet-500/15 via-card to-sky-500/10 shadow-violet-950/20"
-                  : "border-border/70 bg-muted/15 opacity-80",
+                "quiz-card animate-in fade-in-0 slide-in-from-bottom-2 space-y-2 overflow-hidden rounded-xl border p-3 shadow-sm transition-all duration-200 fill-mode-both",
+                !row.selected && "quiz-card-off",
               )}
             >
               <div className="flex items-center gap-2">
@@ -205,7 +203,7 @@ export function TeacherQuizReviewPanel({
                   }
                   aria-label={`Include card ${index + 1}`}
                 />
-                <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-100 ring-1 ring-violet-300/30">
+                <span className="quiz-card-badge rounded-full px-2 py-0.5 text-xs font-medium">
                   Card {index + 1}
                   {passageCard ? " · Passage" : mixedReview ? " · Regular" : ""}
                 </span>
@@ -219,7 +217,7 @@ export function TeacherQuizReviewPanel({
                 <TeacherReviewFieldLabel
                   htmlFor={`teacher-quiz-front-${row.id}`}
                   label="Front"
-                  className="text-sky-300"
+                  className="quiz-field-label"
                   help="The question or prompt shown on the front of the flashcard — e.g. “What is a colony?”"
                 />
                 <Textarea
@@ -229,7 +227,7 @@ export function TeacherQuizReviewPanel({
                   rows={passageCard ? (previewExpanded ? 22 : 10) : 2}
                   disabled={disabled}
                   className={cn(
-                    "resize-y border-sky-500/40 text-sm text-sky-200",
+                    "quiz-front resize-y text-sm",
                     previewExpanded && passageCard
                       ? "min-h-[28rem]"
                       : "min-h-[2.5rem]",
@@ -242,7 +240,7 @@ export function TeacherQuizReviewPanel({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5 text-xs"
+                    className="quiz-swap h-8 gap-1.5 text-xs"
                     disabled={disabled}
                     onClick={() => swapRowFrontBack(row.id)}
                     aria-label={`Swap front and back for card ${index + 1}`}
@@ -257,7 +255,7 @@ export function TeacherQuizReviewPanel({
                 <TeacherReviewFieldLabel
                   htmlFor={`teacher-quiz-back-${row.id}`}
                   label="Back"
-                  className="text-emerald-400"
+                  className="quiz-field-label"
                   help="The correct answer saved with this card. For math/problem-solving, use Step 1: … Answer: … so Standard Review study mode shows the breakdown; Quiz mode still shows only the final Answer: value."
                 />
                 <Textarea
@@ -266,7 +264,7 @@ export function TeacherQuizReviewPanel({
                   onChange={(event) => updateRow(row.id, { back: event.target.value })}
                   rows={row.back.includes("Step") ? 8 : 3}
                   disabled={disabled}
-                  className="min-h-[3rem] resize-y border-emerald-500/40 text-sm text-emerald-300"
+                  className="quiz-back min-h-[3rem] resize-y text-sm"
                 />
               </div>
               {!passageCard ? (
@@ -310,18 +308,18 @@ export function TeacherQuizReviewPanel({
                   </div>
                 </div>
               ) : null}
-              <div className="space-y-2 rounded-md border border-red-500/40 bg-red-500/5 px-2.5 py-2.5">
+              <div className="quiz-wrongs space-y-2 px-2.5 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <TeacherReviewFieldLabel
                     label="Quiz wrong answers (preview)"
-                    className="text-red-400"
+                    className="quiz-field-label"
                     help="Three incorrect options stored with the correct answer for multiple-choice quiz mode. All three are required before saving."
                   />
                   <TeacherTooltipButton
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 gap-1 px-2 text-[11px]"
+                    className="quiz-regenerate h-7 gap-1 px-2 text-[11px]"
                     disabled={disabled || row.distractorsLoading}
                     onClick={() => regenerateRowDistractors(row.id)}
                     tooltip="Ask AI to generate a fresh set of three plausible wrong answers for this card."
@@ -345,7 +343,7 @@ export function TeacherQuizReviewPanel({
                     <TeacherReviewFieldLabel
                       htmlFor={`teacher-quiz-distractor-${row.id}-${distractorIndex}`}
                       label={`Wrong answer ${distractorIndex + 1}`}
-                      className="text-red-400"
+                      className="quiz-field-label"
                       help="A plausible but incorrect choice shown alongside the correct answer during quiz study."
                     />
                     <Textarea
@@ -356,7 +354,7 @@ export function TeacherQuizReviewPanel({
                       }
                       disabled={disabled || row.distractorsLoading}
                       rows={distractorIndex === 0 ? 2 : 1}
-                      className="min-h-[2rem] resize-y border-red-500/40 text-sm text-red-300"
+                      className="quiz-wrong min-h-[2rem] resize-y text-sm"
                     />
                   </div>
                 ))}

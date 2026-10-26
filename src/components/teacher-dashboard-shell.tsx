@@ -39,12 +39,20 @@ export function TeacherDashboardShell({
   const pathname = usePathname();
 
   useEffect(() => {
+    document.body.classList.add("teacher-workspace");
+    return () => document.body.classList.remove("teacher-workspace");
+  }, []);
+
+  useEffect(() => {
     dismissOpenOverlays();
     setMobileOpen(false);
   }, [pathname]);
 
   return (
-    <div className="lesson-studio-shell mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 lg:flex-row lg:items-start lg:gap-8">
+    <div className="lesson-studio-shell mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6">
+      {topBar}
+
+      <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
       <aside className="hidden w-60 shrink-0 lg:block xl:w-64">
         <div className="sticky top-20">
           <Suspense fallback={<TeacherNavSkeleton />}>
@@ -54,19 +62,17 @@ export function TeacherDashboardShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        {topBar}
-
         <div className="flex items-center lg:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger
               render={
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button variant="outline" size="sm" className="teacher-menu-trigger gap-2">
                   <Menu className="size-4" aria-hidden />
                   Teacher menu
                 </Button>
               }
             />
-            <SheetContent side="left" className="w-[min(100vw-2rem,18rem)] gap-0 p-0">
+            <SheetContent side="left" className="teacher-menu-sheet w-[min(100vw-2rem,18rem)] gap-0 p-0">
               <SheetHeader className="border-b border-border px-4 py-3 text-left">
                 <SheetTitle className="text-base">Teacher tools</SheetTitle>
               </SheetHeader>
@@ -83,6 +89,7 @@ export function TeacherDashboardShell({
         </div>
 
         <main className="min-w-0 flex-1">{children}</main>
+      </div>
       </div>
     </div>
   );

@@ -53,7 +53,7 @@ function FooterContactDetails({
   const mapHref = `https://maps.google.com/?q=${encodeURIComponent(addressLines.join(", "))}`;
 
   return (
-    <footer className="relative z-10 mt-auto border-t border-border bg-transparent text-foreground">
+    <footer data-site-footer="" className="relative z-10 mt-auto border-t border-border bg-transparent text-foreground">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px overflow-hidden" aria-hidden>
         <div className="animate-aurora h-full w-full bg-gradient-to-r from-cyan-400/0 via-cyan-300/80 to-teal-300/0" />
       </div>
@@ -165,7 +165,7 @@ export async function SiteContactFooter() {
   } catch (error) {
     console.error("[SiteContactFooter]", error);
     return (
-      <footer className="relative z-10 mt-auto border-t border-border bg-transparent px-4 py-6 text-foreground">
+      <footer data-site-footer="" className="relative z-10 mt-auto border-t border-border bg-transparent px-4 py-6 text-foreground">
         <LegalLinks />
       </footer>
     );
