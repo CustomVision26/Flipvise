@@ -351,6 +351,8 @@ export async function getCardById(cardId: number, deckId: number) {
 }
 
 export async function deleteCard(cardId: number, deckId: number) {
+  const { recordCardDeletion } = await import("@/db/queries/content-deletion-logs");
+  await recordCardDeletion(cardId, deckId);
   return db
     .delete(cards)
     .where(and(eq(cards.id, cardId), eq(cards.deckId, deckId)));

@@ -3425,8 +3425,38 @@ html[data-illustrated="on"] :is(
 ) {
   background: #fff8ee !important;
   color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
   border-color: #e7d7c3 !important;
   text-shadow: none;
+}
+
+html[data-illustrated="on"] :is(
+  .illustrated-cards-toolbar,
+  .illustrated-cards-meta,
+  .panel-see-through-chrome,
+  .study-contrast-controls
+) :is(
+  [data-slot="select-trigger"],
+  [data-slot="button"][data-variant="outline"],
+  [data-slot="button"][data-variant="secondary"],
+  [data-slot="button"][data-variant="ghost"]
+) :is(span, svg),
+html.dark .personal-dashboard-page .personal-dash-panel .panel-see-through-chrome :is(
+  [data-slot="select-trigger"],
+  [data-slot="select-trigger"] :is(span, svg),
+  [data-slot="button"][data-variant="outline"],
+  [data-slot="button"][data-variant="outline"] :is(span, svg)
+),
+html[data-illustrated="on"].dark .personal-dashboard-page .personal-dash-panel .panel-see-through-chrome :is(
+  [data-slot="select-trigger"],
+  [data-slot="select-trigger"] :is(span, svg),
+  [data-slot="button"][data-variant="outline"],
+  [data-slot="button"][data-variant="outline"] :is(span, svg)
+) {
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
 }
 
 html[data-illustrated="on"] .illustrated-study-modes [data-slot="tabs-list"] {
@@ -10387,6 +10417,319 @@ html.dark .library-dialog button[data-variant="default"] :is(svg) {
   max-width: 100%;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+}
+
+.admin-user-profile-dialog {
+  display: flex;
+  width: min(72rem, calc(100vw - 1.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))) !important;
+  max-width: min(72rem, calc(100vw - 1.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))) !important;
+  max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1rem)) !important;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+  border: 1px solid #c4b5fd !important;
+  border-radius: 1.4rem !important;
+  background: #f7f4ff !important;
+  color: #1e1b4b !important;
+  padding: 0 !important;
+}
+html.dark .admin-user-profile-dialog {
+  background: #160b3a !important;
+  color: #f8fafc !important;
+  border-color: #7c3aed !important;
+}
+.admin-user-profile-dialog .admin-profile-header {
+  margin: 0;
+  padding: 1.25rem 1.5rem 1rem;
+  background: linear-gradient(120deg, #5b21b6 0%, #7c3aed 55%, #0ea5e9 100%);
+  color: #ffffff;
+}
+html.dark .admin-user-profile-dialog .admin-profile-header {
+  background: linear-gradient(120deg, #2e1065 0%, #6d28d9 48%, #0369a1 100%);
+}
+.admin-user-profile-dialog .admin-profile-header :is(h2, p, span) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+.admin-user-profile-dialog .admin-profile-kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.admin-user-profile-dialog .admin-profile-tabs {
+  min-height: 0;
+  flex: 1;
+  padding: 0 1rem 1rem;
+}
+.admin-user-profile-dialog .admin-profile-tab-list {
+  display: flex;
+  width: 100%;
+  height: auto;
+  gap: 0.4rem;
+  overflow-x: auto;
+  border-radius: 999px;
+  background: #ede9fe !important;
+  padding: 0.3rem;
+}
+html.dark .admin-user-profile-dialog .admin-profile-tab-list {
+  background: #241556 !important;
+}
+.admin-user-profile-dialog .admin-profile-tab-list [data-slot="tabs-trigger"] {
+  border-radius: 999px !important;
+  color: #5b21b6 !important;
+  -webkit-text-fill-color: #5b21b6 !important;
+  background: transparent !important;
+}
+html.dark .admin-user-profile-dialog .admin-profile-tab-list [data-slot="tabs-trigger"] {
+  color: #ddd6fe !important;
+  -webkit-text-fill-color: #ddd6fe !important;
+}
+.admin-user-profile-dialog .admin-profile-tab-list [data-slot="tabs-trigger"][data-active] {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+.admin-user-profile-dialog .admin-profile-panel {
+  display: grid;
+  max-height: min(62dvh, 40rem);
+  gap: 0.85rem;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+.admin-user-profile-dialog .admin-profile-card {
+  border-radius: 1rem;
+  border: 1px solid #ddd6fe;
+  background: #ffffff;
+  padding: 0.9rem 1rem 1rem;
+}
+html.dark .admin-user-profile-dialog .admin-profile-card {
+  background: #1b1148;
+  border-color: #6d28d9;
+}
+.admin-user-profile-dialog .admin-profile-card[data-tone="gold"] { border-top: 4px solid #d97706; }
+.admin-user-profile-dialog .admin-profile-card[data-tone="violet"] { border-top: 4px solid #7c3aed; }
+.admin-user-profile-dialog .admin-profile-card[data-tone="sky"] { border-top: 4px solid #0284c7; }
+.admin-user-profile-dialog .admin-profile-card[data-tone="emerald"] { border-top: 4px solid #059669; }
+.admin-user-profile-dialog .admin-profile-card[data-tone="rose"] { border-top: 4px solid #e11d48; }
+.admin-user-profile-dialog .admin-profile-card h3,
+.admin-user-profile-dialog .admin-profile-card h4 {
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+  font-weight: 700;
+}
+html.dark .admin-user-profile-dialog .admin-profile-card h3,
+html.dark .admin-user-profile-dialog .admin-profile-card h4 {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+.admin-user-profile-dialog .admin-profile-card h3 { font-size: 0.95rem; }
+.admin-user-profile-dialog .admin-profile-card h4 {
+  margin-top: 0.8rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.admin-user-profile-dialog .admin-profile-note,
+.admin-user-profile-dialog .admin-profile-empty,
+.admin-user-profile-dialog .admin-profile-row dt {
+  color: #6d28d9 !important;
+  -webkit-text-fill-color: #6d28d9 !important;
+}
+html.dark .admin-user-profile-dialog .admin-profile-note,
+html.dark .admin-user-profile-dialog .admin-profile-empty,
+html.dark .admin-user-profile-dialog .admin-profile-row dt {
+  color: #ddd6fe !important;
+  -webkit-text-fill-color: #ddd6fe !important;
+}
+.admin-user-profile-dialog .admin-profile-note,
+.admin-user-profile-dialog .admin-profile-empty {
+  margin: 0.35rem 0 0.6rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.admin-user-profile-dialog .admin-profile-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr);
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid #ede9fe;
+  font-size: 0.9rem;
+}
+html.dark .admin-user-profile-dialog .admin-profile-row {
+  border-bottom-color: #3b276b;
+}
+.admin-user-profile-dialog .admin-profile-row dd {
+  margin: 0;
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+html.dark .admin-user-profile-dialog .admin-profile-row dd {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+.admin-user-profile-dialog .admin-profile-sub + .admin-profile-sub {
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid #ede9fe;
+}
+html.dark .admin-user-profile-dialog .admin-profile-sub + .admin-profile-sub {
+  border-top-color: #3b276b;
+}
+.admin-user-profile-dialog .admin-profile-record {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.9rem;
+  border: 1px solid #ddd6fe;
+  background: #faf8ff;
+}
+html.dark .admin-user-profile-dialog .admin-profile-record {
+  background: #140b32;
+  border-color: #4c1d95;
+}
+.admin-user-profile-dialog .admin-profile-record[data-tone="emerald"] { border-left: 5px solid #059669; }
+.admin-user-profile-dialog .admin-profile-record[data-tone="rose"] { border-left: 5px solid #e11d48; }
+.admin-user-profile-dialog .admin-profile-record > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.admin-user-profile-dialog .admin-profile-record > header :is(p, span) {
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+}
+html.dark .admin-user-profile-dialog .admin-profile-record > header :is(p, span) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+.admin-user-profile-dialog .admin-profile-subtable {
+  display: grid;
+  gap: 0.35rem;
+  margin-left: 0.65rem;
+  padding: 0.55rem 0.65rem 0.7rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e9e4ff;
+  background: #ffffff;
+}
+html.dark .admin-user-profile-dialog .admin-profile-subtable {
+  background: #1b1148;
+  border-color: #3b276b;
+}
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="sky"] { border-left: 4px solid #0284c7; }
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="emerald"] { border-left: 4px solid #059669; }
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="gold"] { border-left: 4px solid #d97706; }
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="violet"] { border-left: 4px solid #7c3aed; }
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="rose"] { border-left: 4px solid #e11d48; }
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="amber"] { border-left: 4px solid #d97706; }
+.admin-user-profile-dialog .admin-profile-subtable-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="sky"] .admin-profile-subtable-title { color: #0369a1 !important; -webkit-text-fill-color: #0369a1 !important; }
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="violet"] .admin-profile-subtable-title { color: #6d28d9 !important; -webkit-text-fill-color: #6d28d9 !important; }
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="rose"] .admin-profile-subtable-title { color: #be123c !important; -webkit-text-fill-color: #be123c !important; }
+.admin-user-profile-dialog .admin-profile-subtable[data-tone="amber"] .admin-profile-subtable-title { color: #b45309 !important; -webkit-text-fill-color: #b45309 !important; }
+html.dark .admin-user-profile-dialog .admin-profile-subtable[data-tone="sky"] .admin-profile-subtable-title { color: #7dd3fc !important; -webkit-text-fill-color: #7dd3fc !important; }
+html.dark .admin-user-profile-dialog .admin-profile-subtable[data-tone="violet"] .admin-profile-subtable-title { color: #ddd6fe !important; -webkit-text-fill-color: #ddd6fe !important; }
+html.dark .admin-user-profile-dialog .admin-profile-subtable[data-tone="rose"] .admin-profile-subtable-title { color: #fda4af !important; -webkit-text-fill-color: #fda4af !important; }
+html.dark .admin-user-profile-dialog .admin-profile-subtable[data-tone="amber"] .admin-profile-subtable-title { color: #fcd34d !important; -webkit-text-fill-color: #fcd34d !important; }
+.admin-user-profile-dialog .admin-profile-table {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 0.65rem;
+}
+.admin-user-profile-dialog .admin-profile-table[data-tone="sky"] thead { background: #e0f2fe; }
+.admin-user-profile-dialog .admin-profile-table[data-tone="emerald"] thead { background: #d1fae5; }
+.admin-user-profile-dialog .admin-profile-table[data-tone="gold"] thead { background: #fef3c7; }
+.admin-user-profile-dialog .admin-profile-table[data-tone="violet"] thead { background: #ede9fe; }
+.admin-user-profile-dialog .admin-profile-table[data-tone="rose"] thead { background: #ffe4e6; }
+.admin-user-profile-dialog .admin-profile-table[data-tone="amber"] thead { background: #ffedd5; }
+html.dark .admin-user-profile-dialog .admin-profile-table[data-tone="sky"] thead { background: #0c4a6e; }
+html.dark .admin-user-profile-dialog .admin-profile-table[data-tone="emerald"] thead { background: #064e3b; }
+html.dark .admin-user-profile-dialog .admin-profile-table[data-tone="gold"] thead { background: #78350f; }
+html.dark .admin-user-profile-dialog .admin-profile-table[data-tone="violet"] thead { background: #4c1d95; }
+html.dark .admin-user-profile-dialog .admin-profile-table[data-tone="rose"] thead { background: #881337; }
+html.dark .admin-user-profile-dialog .admin-profile-table[data-tone="amber"] thead { background: #9a3412; }
+.admin-user-profile-dialog .admin-profile-table tbody tr:nth-child(even) {
+  background: rgb(237 233 254 / 0.45);
+}
+html.dark .admin-user-profile-dialog .admin-profile-table tbody tr:nth-child(even) {
+  background: rgb(255 255 255 / 0.04);
+}
+.admin-user-profile-dialog .admin-profile-table :is(th, td) {
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+  white-space: normal;
+}
+html.dark .admin-user-profile-dialog .admin-profile-table :is(th, td) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+.admin-user-profile-dialog .admin-profile-count {
+  display: inline-flex;
+  min-width: 1.6rem;
+  justify-content: center;
+  border-radius: 999px;
+  background: #7c3aed;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+}
+.admin-user-profile-dialog .admin-profile-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #ede9fe;
+  color: #5b21b6 !important;
+  -webkit-text-fill-color: #5b21b6 !important;
+}
+.admin-user-profile-dialog .admin-profile-status[data-status="Removed"],
+.admin-user-profile-dialog .admin-profile-status[data-status="canceled"] {
+  background: #ffe4e6;
+  color: #be123c !important;
+  -webkit-text-fill-color: #be123c !important;
+}
+.admin-user-profile-dialog .admin-profile-status[data-status="active"],
+.admin-user-profile-dialog .admin-profile-status[data-status="Assigned"] {
+  background: #d1fae5;
+  color: #047857 !important;
+  -webkit-text-fill-color: #047857 !important;
+}
+html.dark .admin-user-profile-dialog .admin-profile-status[data-status="Removed"],
+html.dark .admin-user-profile-dialog .admin-profile-status[data-status="canceled"] {
+  background: #4c0519;
+  color: #fecdd3 !important;
+  -webkit-text-fill-color: #fecdd3 !important;
+}
+html.dark .admin-user-profile-dialog .admin-profile-status[data-status="active"],
+html.dark .admin-user-profile-dialog .admin-profile-status[data-status="Assigned"] {
+  background: #064e3b;
+  color: #a7f3d0 !important;
+  -webkit-text-fill-color: #a7f3d0 !important;
+}
+.admin-user-profile-dialog [data-slot="dialog-close"] {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: rgb(255 255 255 / 0.16) !important;
+}
+.admin-user-profile-dialog .admin-profile-header [data-slot="badge"] {
+  border-color: rgb(255 255 255 / 0.45) !important;
+  background: rgb(255 255 255 / 0.16) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
 .team-admin-surface [data-slot="progress-indicator"] {

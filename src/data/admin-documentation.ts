@@ -15,6 +15,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Central platform administration hub for monitoring users, billing, support, plans, and affiliates.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Overview metrics show total users, decks, cards, admin-granted Pro Plus, and paid subscriber counts.",
           "Sticky left sidebar (Teacher Dashboard–style) groups navigation: Overview Dashboard, Users & workspaces, Billing, AI & analytics, Access & support (including Feature Controls), Plans & growth, and Documentation.",
           "Personal Dashboard link returns to your own Flipvise workspace.",
@@ -42,6 +43,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/all-users",
         purpose: "Search, filter, and manage every registered Clerk user.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Search by name or email; filter by plan, role (admin/user), and online/offline/banned status.",
           "Table columns include phone, type/status, and Admin accessed (last time an admin opened the profile dialog).",
           "Double-click a row to open the profile dialog with plan, billing, phone, mailing address, type/status, and security Q&A; each open records Admin accessed date/time.",
@@ -60,6 +62,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/subscription",
         purpose: "View Stripe-backed subscription rows derived from Clerk billing metadata and DB snapshots.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Lists plan slug, status, period dates, and user identity.",
           "Filter by paid-only, subscription status (active, trialing, past_due, canceled, inactive).",
           "Export CSV for offline analysis.",
@@ -75,6 +78,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/subscription-monitor",
         purpose: "Track billing alerts: trials, expirations, payment grace, and past-due users.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Billing monitor tab groups alerts by user, with a nested incident table for category, event time, and full detail (trial start, trial end, and first charge when on a trial).",
           "Search, category filter, and CSV export for operational follow-up.",
         ],
@@ -87,6 +91,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/subscription-deletion-proration",
         purpose: "Manage prorated refunds and receipts for paid users who deleted before period end.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Proration still owed tally: rows where auto-refund failed or was never issued.",
           "Refund via Stripe when auto-refund failed; Send receipt for optional Flipvise-branded email (Loops).",
           "Stripe auto-refund email: Dashboard → Settings → Customer emails → enable Refunds (test + live).",
@@ -107,6 +112,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/invoices",
         purpose: "Review persisted Stripe invoice history with promo attribution.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Filter by invoice status, date range, and search (invoice #, name, email).",
           "Promo column shows general vs affiliate codes and discount detail.",
           "Open Flipvise receipt (plan start, plan end, auto-renewal On or Off; seller address from Contact Us company address — street, city, and phone; no apartment).",
@@ -124,6 +130,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/paid-subscribers",
         purpose: "Monthly breakdown of paying customers with revenue and promo analytics.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Grouped by calendar month for the selected year.",
           "Summary chips: Plan type Paid count, active subs, canceling, revenue YTD.",
           "Filter by year, month, plan, search, and sort.",
@@ -147,6 +154,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/team-workspaces",
         purpose: "Inspect team-tier owners, workspace counts, invitee totals, and per-workspace details.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Lists users on team-tier plans with expandable workspace detail rows.",
           "Shows workspace names, member counts, and plan slug per owned team.",
           "Search and role/status filters match All Users patterns.",
@@ -174,6 +182,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/admin-roles",
         purpose: "Grant or revoke platform co-admin (admin) roles.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Roles sub-tab lists every user with current role badge.",
           "Toggle Admin Role — only superadmin/owner can promote or demote co-admins.",
           "Granting admin applies complimentary Pro Plus–level personal workspace features via metadata snapshot (includes AI Recall™ and other Pro Plus entitlements).",
@@ -190,6 +199,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/audit-log",
         purpose: "Read-only log of admin privilege grants and revocations.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Each row: target user, actor, action (granted/revoked), timestamp.",
           "Paired with Admin Roles tab under the same section.",
         ],
@@ -202,6 +212,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/feature-controls",
         purpose: "Master switch for the optional illustrated deck design.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Enable Illustrated Deck Design lets signed-in users on every plan, including Free, turn on cartoon artwork, backgrounds, and layered cards. Matching scenes come from the local reference bank before any online image generation. Turning the switch off shows the standard design for everyone.",
           "User preferences and deck cover images are kept. Turning the switch back on restores each saved choice.",
           "Save changes writes the switch and an audit row (administrator, old value, new value, time, action illustrated_design_enabled).",
@@ -229,6 +240,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/support-center",
         purpose: "Triage Help Center tickets submitted by signed-in users.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Filter by category, status, priority; search subject and user.",
           "Open thread to reply, change status, and view attachments.",
           "Stats summarize open, urgent, and resolved counts.",
@@ -244,6 +256,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/support-center/contact-us",
         purpose: "Manage public Contact Us live chat threads and platform contact settings.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Reply to guest and signed-in Contact Us messages.",
           "Archive or mark threads read; stats show open and weekly volume.",
           "Edit support email, phone, WhatsApp number, company address (state / province / parish), and social links shown on /contact and in the page footer.",
@@ -267,6 +280,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/plans",
         purpose: "Edit plans-config.json tiers, prices, features, and promotion windows.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Edit plan display, Stripe price env references, discount coupons, and promo schedules.",
           "Changes affect /pricing cards and checkout validation.",
           "Checkout recovers if Render still has a deleted STRIPE_*_PRICE_ID by finding the tagged/named Stripe product and a matching catalog Price. Update Render env to the current ids after a price change.",
@@ -289,6 +303,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Edit add-on product names, monthly and yearly prices, and catalog copy, then sync those changes to Stripe.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Addon plans is a sub-tab of Plans, next to Trial settings.",
           "Each add-on card matches the pricing-plan editor: display name, monthly price, yearly price ($/mo billed annually), and description.",
           "Save writes addon_catalog and updates the matching Stripe product (name, description, tax code). /pricing/add-ons reads those catalog amounts so cards match Addon Plans even when Stripe price retrieve fails.",
@@ -313,6 +328,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Enable optional premium add-ons, publish them on /pricing/add-ons, grant or revoke complimentary access, and monitor AI Essay usage.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Page header summarizes registered, active, and Pricing-listed add-ons.",
           "Master toggle shows or hides the public Add-on Catalog page.",
           "Per-add-on Active, Published (header banner), and On pricing switches control purchase, banner chips, and catalog listing.",
@@ -337,6 +353,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/plan-history",
         purpose: "Audit log of admin-initiated plan grants, changes, and revocations.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Lists target user, action, plan names, assigning admin, and timestamp.",
           "Complements per-user Assign User Plan workflow with invite acceptance.",
         ],
@@ -349,6 +366,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/affiliate-messaging",
         purpose: "Broadcast promo announcements to active affiliates via dashboard inbox.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Compose broadcast subject and body for affiliate inbox delivery.",
           "No Loops email — recipients must resolve to a Clerk user.",
           "Use for campaign announcements alongside pricing promo windows.",
@@ -364,6 +382,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/marketing-affiliates",
         purpose: "Invite, edit, revoke, and quota-manage marketing affiliate arrangements.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Invite affiliate by email with plan grant (including education tiers), end date, and accept-link expiry. The invite dialog also has a Special feature promo tab for expo, TV, and social media codes linked to Stripe. Choose Add a channel to type a name that is not in the list.",
           "Special feature promos tab lists those codes. Double-click a row to open the code, link, and QR code, then share them to messages, WhatsApp, email, or social apps. Edit updates the channel, label, percent, plans, and dates. The Status switch turns a code on or off.",
           "Edit pending invites or active arrangements (arrangement changes require affiliate confirmation).",
@@ -382,6 +401,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/plan-trials",
         purpose: "Configure free-trial length and pricing-page visibility per paid tier.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Set trial days (0–90) and Published on pricing toggle for each paid plan.",
           "Published trials appear as Start free trial on /pricing (monthly checkout only).",
           "Each user may start a published trial only once — tracked in user_plan_trials.",
@@ -408,6 +428,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Monitor platform-wide AI generations, token consumption, estimated costs, plan limits, and per-user activity.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Summary cards compare the selected range to the prior equivalent period (generations, active users, tokens, cost, success/fail, latency).",
           "Charts cover generations over time, usage by feature, tokens/cost, subscription plan mix, request outcomes, and model usage.",
           "Filters (date preset, plan, team, feature, model, status, usage status, search) stay in the URL query string.",
@@ -437,6 +458,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Maintain user (/docs) and admin guides with manual edits, search, and the documentation AI agent.",
         howItWorks: [
+          "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
           "Switch between Admin documentation and User documentation tabs.",
           "Edit mode toggles inline edit buttons on quick reference and in-depth guides.",
           "Manual edits save to documentation_overrides in the database — visible immediately at /docs and /admin/documentation.",

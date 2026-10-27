@@ -481,6 +481,22 @@ export const adminUserProfileAccessLogs = pgTable(
   ],
 );
 
+/** Decks and cards removed from an account, kept for the admin History tab. */
+export const contentDeletionLogs = pgTable(
+  'content_deletion_logs',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    ownerUserId: varchar({ length: 255 }).notNull(),
+    /** `deck` or `card`. */
+    kind: varchar({ length: 16 }).notNull(),
+    deckName: varchar({ length: 255 }).notNull(),
+    cardCount: integer(),
+    cardLabel: varchar({ length: 255 }),
+    deletedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [index('content_deletion_logs_owner_idx').on(t.ownerUserId, t.deletedAt)],
+);
+
 export const adminPlanAssignmentLogs = pgTable('admin_plan_assignment_logs', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   targetUserId: varchar({ length: 255 }).notNull(),

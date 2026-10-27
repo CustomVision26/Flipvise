@@ -352,6 +352,8 @@ export async function setDeckCoverImageUrl(
 }
 
 export async function deleteDeck(deckId: number, userId: string) {
+  const { recordDeckDeletion } = await import("@/db/queries/content-deletion-logs");
+  await recordDeckDeletion(deckId, userId);
   return db
     .delete(decks)
     .where(and(eq(decks.id, deckId), eq(decks.userId, userId)));

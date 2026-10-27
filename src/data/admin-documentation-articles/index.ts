@@ -78,7 +78,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Filter by status: online, offline, or banned.",
           "Phone and Type/status columns show account details from Clerk public metadata when set.",
           "Admin accessed shows the last date/time a platform admin opened that user's profile dialog.",
-          "Double-click a row to open the profile dialog with plan, billing, phone, mailing address, type/status, security Q&A, and metadata; opening the dialog refreshes private security answers and logs Admin accessed.",
+          "Double-click a row to open the profile dialog. Profile shows billing, phone, mailing address, type/status, and security Q&A. Records shows personal decks, invited workspaces, and, for a team plan owner, members, linked decks, and assignments. History shows the current plan, earlier plans, and deleted decks and cards with date and time. Opening the dialog refreshes private security answers and logs Admin accessed.",
         ],
       },
       {
