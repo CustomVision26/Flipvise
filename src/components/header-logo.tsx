@@ -14,10 +14,9 @@ export function HeaderLogo({ dashboardHref }: { dashboardHref: string }) {
     <Image
       src={LOGO_PUBLIC_URL}
       alt="Flipvise"
-      width={160}
-      height={60}
-      className="object-contain h-10 sm:h-12 w-auto bg-transparent"
-      style={{ width: "auto" }}
+      width={832}
+      height={812}
+      className="header-brand-logo bg-transparent object-contain"
       unoptimized
       priority
     />

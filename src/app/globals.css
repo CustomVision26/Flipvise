@@ -3558,6 +3558,27 @@ html[data-illustrated="on"] .deck-page-surface {
   background-color: rgb(255 250 243 / 0.5) !important;
 }
 
+.home-hero-logo,
+.header-brand-logo {
+  image-rendering: high-quality;
+  filter: none !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+.header-brand-logo {
+  height: 3.25rem !important;
+  width: auto !important;
+  max-width: none;
+  background: transparent !important;
+}
+
+@media (min-width: 640px) {
+  .header-brand-logo {
+    height: 3.5rem !important;
+  }
+}
+
 .dark .home-hero-card,
 .dark .home-feature-card {
   border-color: #c4b5fd !important;

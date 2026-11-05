@@ -49,6 +49,8 @@ permissions:
 jobs:
   build:
     name: Build & upload to TestFlight
+    # Version-only commits must not ship a new iOS build.
+    if: ${{ !contains(github.event.head_commit.message, 'chore: bump Flipvise version') }}
     # macos-26 ships Xcode 26 / iOS 26 SDK, which Apple now requires for uploads.
     runs-on: macos-26
     timeout-minutes: 45

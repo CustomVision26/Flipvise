@@ -89,10 +89,9 @@ export default async function Home({ searchParams }: HomePageProps) {
                 <Image
                   src={LOGO_PUBLIC_URL}
                   alt="Flipvise"
-                  width={200}
-                  height={75}
-                  className="mx-auto block h-auto w-36 object-contain sm:w-44"
-                  style={{ width: "auto", height: "auto" }}
+                  width={832}
+                  height={812}
+                  className="home-hero-logo mx-auto block h-auto w-full object-contain"
                   unoptimized
                   priority
                 />

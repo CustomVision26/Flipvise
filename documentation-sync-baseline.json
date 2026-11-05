@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-27T01:02:04.583Z",
+  "updatedAt": "2026-11-05T20:16:44.303Z",
   "pages": {
     "homepage": {
-      "watchFingerprint": "0cf8e04dc4022ac789af102286ffc2e4d67b305c840688c5c344bb9bb5601d7f",
-      "docFingerprint": "f5d5a02ce5b55193e9a9c39a2de46d5acdc6760e1f9e2733f8572f9c1a0b8fc4"
+      "watchFingerprint": "5ce6f266238ea320067c5f1553af7eb853e467babdbd5e8571c0076ffcf33129",
+      "docFingerprint": "6f909bf40bf472ef62a6058b0a1c45a6ea23445246f86c8d4966cd38e2013cad"
     },
     "header-navigation": {
       "watchFingerprint": "91a45c049afea47555787ff0767bd55da35073a1a488377ec9240a057d8caed9",

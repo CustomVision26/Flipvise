@@ -43,6 +43,8 @@ concurrency:
 jobs:
   build:
     name: Build & distribute via Firebase
+    # Version-only commits must not ship a new Android build.
+    if: ${{ !contains(github.event.head_commit.message, 'chore: bump Flipvise version') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
