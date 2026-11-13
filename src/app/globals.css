@@ -2180,6 +2180,69 @@ html[data-flipvise-native-shell] [data-app-header].has-team-admin [data-header-t
   justify-content: center;
 }
 
+/* Phone header: logo, then the add-on banner on its own row, then account tools. */
+html[data-flipvise-native-shell] [data-header-brand] [data-header-pills] {
+  display: none !important;
+}
+
+html[data-flipvise-native-shell] [data-app-header] > [data-header-pills] {
+  display: flex !important;
+  flex: 1 1 100%;
+  order: 2;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+html[data-flipvise-native-shell] [data-addons-banner="header"] {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+html[data-flipvise-native-shell] [data-addons-banner="header"] > div {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+html[data-flipvise-native-shell] .header-addon-pill {
+  width: 100%;
+  height: 2.15rem;
+  max-width: 100%;
+  justify-content: flex-start;
+  padding: 0 0.7rem 0 0.3rem;
+  font-size: 0.75rem;
+}
+
+html[data-flipvise-native-shell] .header-addon-copy {
+  display: none !important;
+}
+
+html[data-flipvise-native-shell] [data-header-user] {
+  flex: 1 1 100%;
+  order: 3;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  justify-content: flex-start;
+}
+
+html[data-flipvise-native-shell] [data-header-tools] {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  order: 0;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
 /* ========================================
    STUDIO SURFACES
    Formal depth for dashboards, study, decks, and teacher tools.

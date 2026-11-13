@@ -84,11 +84,13 @@ function AddonChipButton({
   colorIndex,
   onActivate,
   header = false,
+  className,
 }: {
   item: DashboardAddonBannerItem;
   colorIndex: number;
   onActivate: (item: DashboardAddonBannerItem) => void;
   header?: boolean;
+  className?: string;
 }) {
   const headerName = item.name.replace(/^Flipvise\s+/i, "");
   const headerLabel = item.unlocked
@@ -113,7 +115,7 @@ function AddonChipButton({
         type="button"
         data-addon-key={item.key}
         onClick={() => onActivate(item)}
-        className="header-addon-pill"
+        className={cn("header-addon-pill", className)}
         title={item.blurb || item.name}
       >
         <span className="header-addon-glyph" aria-hidden>
@@ -282,6 +284,7 @@ export function DashboardAddonsBanner({
                   key={`${item.key}-${copy}`}
                   item={item}
                   header
+                  className={copy === 1 ? "header-addon-copy" : undefined}
                   colorIndex={colorIndexForAddon(item.key, index)}
                   onActivate={onChipActivate}
                 />
