@@ -53,7 +53,7 @@ export default async function NativeSignInPage({
   }
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-background">
+    <div className="native-signin-page relative min-h-dvh overflow-hidden bg-transparent">
       <NativeSignInAtmosphere isNativeContext={isNativeContext} />
       {isNativeContext ? <NativeSignInEscapeChrome /> : null}
       <div className="relative z-10">

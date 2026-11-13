@@ -32,14 +32,21 @@ try {
   const container = document.getElementById("root");
   if (!container) throw new Error("Root element #root not found");
 
-  const logoUrl = `${import.meta.env.BASE_URL}logo.png`;
-
   startBootSplashTimer();
 
   createRoot(container).render(
     <LockGate>
-      <div className="app-watermark" aria-hidden>
-        <img src={logoUrl} alt="" />
+      <div className="app-scene" aria-hidden>
+        <img
+          className="app-scene__light"
+          src={`${import.meta.env.BASE_URL}artwork/woodland-light.png`}
+          alt=""
+        />
+        <img
+          className="app-scene__dark"
+          src={`${import.meta.env.BASE_URL}artwork/woodland-dark.png`}
+          alt=""
+        />
       </div>
       <App />
     </LockGate>,

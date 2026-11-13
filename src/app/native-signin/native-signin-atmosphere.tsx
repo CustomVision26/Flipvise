@@ -14,11 +14,19 @@ export function NativeSignInAtmosphere({
         aria-hidden
         className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
       >
-        <div className="absolute inset-0 bg-background" />
-        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/18 via-background to-teal-500/14" />
-        <div className="absolute -left-20 top-[12%] size-[18rem] rounded-full bg-cyan-500/12" />
-        <div className="absolute -right-16 bottom-[18%] size-[16rem] rounded-full bg-teal-500/10" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-transparent to-background/50" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/artwork/backgrounds/woodland-light.png"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover dark:hidden"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/artwork/backgrounds/woodland-dark.png"
+          alt=""
+          className="absolute inset-0 hidden h-full w-full object-cover dark:block"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/10 to-black/40" />
       </div>
     );
   }

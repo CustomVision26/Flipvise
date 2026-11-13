@@ -59,13 +59,13 @@ const NATIVE_BTN_CLASS =
  * in-card logo mark sits behind form content.
  */
 const NATIVE_AUTH_CARD_CLASS =
-  "relative w-full max-w-sm overflow-hidden border-border/25 bg-card/10 shadow-lg shadow-black/10 ring-1 ring-foreground/8 backdrop-blur-[6px]";
+  "native-signin-card relative w-full max-w-sm overflow-hidden border-[#c4b5fd] bg-[#fffaf3]/95 text-[#1e1b4b] shadow-lg shadow-black/25 ring-1 ring-[#c4b5fd] dark:bg-[#160e30]/95 dark:text-[#f8fafc]";
 
 const NATIVE_AUTH_FOOTER_CLASS =
   "relative z-10 flex flex-col gap-2 border-border/20 bg-transparent";
 
 const NATIVE_AUTH_INPUT_CLASS =
-  "border-border/40 bg-background/35 backdrop-blur-sm";
+  "border-[#7c3aed] bg-white text-[#1e1b4b] dark:border-[#c4b5fd] dark:bg-[#2a1860] dark:text-[#f8fafc]";
 
 const NATIVE_OTP_SLOT_CLASS =
   "size-12 grow rounded-lg border-2 border-foreground/45 bg-background/55 text-lg font-semibold text-foreground shadow-md shadow-black/20 first:rounded-lg first:border-l-2 last:rounded-lg data-[active=true]:border-primary data-[active=true]:ring-2 data-[active=true]:ring-primary/40";

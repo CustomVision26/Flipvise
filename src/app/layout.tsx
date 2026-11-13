@@ -218,8 +218,8 @@ export default async function RootLayout({
     isTeamInviteRoute || isAccountRecoveryOnboardingRoute;
   /**
    * Capacitor `/native-signin` can still have a server session during session_retry /
-   * sign-out lag. Keep the add-on banner, but never show account chrome beside the
-   * Welcome-back form (plan label, avatar, Personal Dash, inbox, etc.).
+   * sign-out lag. Never show account chrome or the add-on banner beside the
+   * Welcome-back form.
    */
   const hideAuthenticatedAccountChrome =
     isMinimalHeaderRoute || isNativeSignInRoute;
@@ -241,7 +241,7 @@ export default async function RootLayout({
   let addonBannerItems: Awaited<
     ReturnType<typeof buildDashboardAddonBannerItems>
   > = [];
-  if (!isMinimalHeaderRoute && (userId || isNativeSignInRoute)) {
+  if (!isMinimalHeaderRoute && userId && !isNativeSignInRoute) {
     try {
       addonBannerItems = await buildDashboardAddonBannerItems({
         activeAddonKeys: userId ? activeAddonKeys : [],
@@ -260,9 +260,7 @@ export default async function RootLayout({
   }
   const showHeaderAddons = addonBannerItems.length > 0;
   const showHeaderChrome =
-    Boolean(userId) ||
-    isTeamInviteRoute ||
-    (isNativeSignInRoute && showHeaderAddons);
+    (Boolean(userId) && !isNativeSignInRoute) || isTeamInviteRoute;
 
   const illustratedPlanSlug = resolvePlanSlugForAddonEligibility({
     effectivePlanSlug,

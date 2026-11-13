@@ -69,11 +69,17 @@ html[data-native-shell][data-flipvise-status-overlay="0"] {
 html, body, #root {
   margin: 0;
   height: 100%;
-  background: var(--bg);
+  background: #070414;
   color: var(--fg);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
+}
+
+:root[data-theme="light"] html,
+:root[data-theme="light"] body,
+:root[data-theme="light"] #root {
+  background: #f6f3ff;
 }
 
 .app {
@@ -85,22 +91,25 @@ html, body, #root {
   padding-bottom: var(--flipvise-safe-bottom);
 }
 
-/* ── Logo watermark (behind all offline screens) ──────────── */
-.app-watermark {
+/* Same woodland artwork the installed website uses behind the dashboard. */
+.app-scene {
   position: fixed;
   inset: 0;
   z-index: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
 }
-.app-watermark img {
-  width: min(62vw, 340px);
-  height: auto;
-  opacity: 0.05;
-  filter: grayscale(1);
+.app-scene__light,
+.app-scene__dark {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
+.app-scene__dark { display: none; }
+:root:not([data-theme="light"]) .app-scene__light { display: none; }
+:root:not([data-theme="light"]) .app-scene__dark { display: block; }
+:root[data-theme="light"] .app-scene__dark { display: none; }
 
 /* ── Lock screen ─────────────────────────────────────────── */
 .lock-screen {
@@ -187,13 +196,18 @@ html, body, #root {
   justify-content: space-between;
   gap: 10px;
   padding: calc(12px + var(--flipvise-safe-top)) 14px 12px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-bar);
-  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #a78bfa;
+  background: linear-gradient(180deg, #2e1065 0%, #160b3a 100%);
+  color: #f8fafc;
   position: sticky;
   top: 0;
   z-index: 50;
   isolation: isolate;
+}
+:root[data-theme="light"] .topbar {
+  border-bottom-color: #c4b5fd;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%);
+  color: #1e1b4b;
 }
 
 .brand {
@@ -216,7 +230,7 @@ html, body, #root {
 }
 .brand-tag {
   font-size: 11px;
-  color: var(--muted-2);
+  color: #ddd6fe;
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -560,6 +574,18 @@ html, body, #root {
 .page-header {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 12px; margin-bottom: 14px;
+  padding: 16px;
+  border: 1px solid #a78bfa;
+  border-radius: 1.35rem;
+  background: linear-gradient(180deg, #2a1868 0%, #140b3a 100%);
+  box-shadow: 0 0 0 1px rgb(167 139 250 / 0.35), 0 18px 40px rgb(2 6 23 / 0.35);
+  color: #f8fafc;
+}
+:root[data-theme="light"] .page-header {
+  border-color: #c4b5fd;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%);
+  box-shadow: 0 16px 36px rgb(76 29 149 / 0.12);
+  color: #1e1b4b;
 }
 .page-header__main { min-width: 0; flex: 1; pointer-events: none; }
 .page-header__actions {
@@ -577,8 +603,15 @@ html, body, #root {
   width: 100%;
   justify-content: center;
 }
-.page-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-.page-subtitle { margin: 4px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+.page-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: #f8fafc; }
+.page-subtitle { margin: 4px 0 0; font-size: 13px; color: #ddd6fe; line-height: 1.4; }
+:root[data-theme="light"] .brand-tag { color: #5b21b6; }
+:root[data-theme="light"] .page-title { color: #1e1b4b; }
+:root[data-theme="light"] .workspace-scope__trigger {
+  background: #ffffff;
+  color: #1e1b4b;
+}
+:root[data-theme="light"] .page-subtitle { color: #5b21b6; }
 
 .workspace-scope {
   position: relative;
@@ -596,10 +629,10 @@ html, body, #root {
   min-height: 44px;
   max-width: 100%;
   padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--fg);
+  border-radius: 999px;
+  border: 1px solid #c4b5fd;
+  background: rgb(255 255 255 / 0.08);
+  color: #f8fafc;
   font: inherit;
   font-size: 13px;
   font-weight: 400;
@@ -1169,9 +1202,9 @@ html, body, #root {
 /* ── Buttons ─────────────────────────────────────────────── */
 .btn {
   appearance: none; border: 0; cursor: pointer;
-  background: var(--accent); color: var(--accent-fg);
+  background: #7c3aed; color: #ffffff;
   font-size: 13px; font-weight: 600;
-  padding: 10px 14px; border-radius: var(--radius);
+  padding: 10px 14px; border-radius: 999px;
   white-space: nowrap;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -1180,8 +1213,13 @@ html, body, #root {
 }
 .btn:active:not(:disabled) { transform: scale(0.98); }
 .btn.secondary {
-  background: var(--panel-2); border: 1px solid var(--border);
-  color: var(--fg);
+  background: rgb(255 255 255 / 0.08);
+  border: 1px solid #c4b5fd;
+  color: #f8fafc;
+}
+:root[data-theme="light"] .btn.secondary {
+  background: #ffffff;
+  color: #1e1b4b;
 }
 .btn--sm { padding: 8px 11px; font-size: 12px; border-radius: 10px; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; color: var(--muted); }
@@ -1206,13 +1244,24 @@ html, body, #root {
 }
 
 .empty {
-  text-align: center; color: var(--muted);
-  margin-top: 12vh; padding: 0 20px; line-height: 1.55;
-  max-width: 22rem;
-  margin-left: auto;
-  margin-right: auto;
+  text-align: center; color: #ddd6fe;
+  margin-top: 0; padding: 28px 20px; line-height: 1.55;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  border: 1px solid #a78bfa;
+  border-radius: 1.35rem;
+  background: linear-gradient(180deg, #2a1868 0%, #140b3a 100%);
+  box-shadow: 0 0 0 1px rgb(167 139 250 / 0.35), 0 18px 40px rgb(2 6 23 / 0.35);
 }
-.empty h2 { color: var(--fg); font-size: 17px; font-weight: 600; margin: 0 0 8px; }
+:root[data-theme="light"] .empty {
+  color: #5b21b6;
+  border-color: #c4b5fd;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%);
+  box-shadow: 0 16px 36px rgb(76 29 149 / 0.12);
+}
+.empty h2 { color: #f8fafc; font-size: 17px; font-weight: 600; margin: 0 0 8px; }
+:root[data-theme="light"] .empty h2 { color: #1e1b4b; }
 .empty p { margin: 0; font-size: 14px; }
 
 /* ── Study / quiz ────────────────────────────────────────── */
