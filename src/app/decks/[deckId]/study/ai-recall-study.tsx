@@ -826,7 +826,7 @@ export function AiRecallStudy({
                     aria-label="Shuffle remaining AI Recall cards"
                   >
                     <Shuffle className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Shuffle</span>
+                    Shuffle
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Shuffle remaining cards</TooltipContent>

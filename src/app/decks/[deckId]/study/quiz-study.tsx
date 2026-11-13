@@ -1814,7 +1814,7 @@ export function QuizStudy({
           <div className="flex items-center gap-2">
             <span
               className={cn(
-                "text-xs hidden sm:inline",
+                "text-xs",
                 deckAccent.hasDeckAccent ? "text-white/70" : "text-muted-foreground",
               )}
             >
@@ -1973,7 +1973,7 @@ export function QuizStudy({
       </div>
       ) : null}
 
-      <div className="grid w-full grid-cols-3 gap-3 sm:gap-4">
+      <div className="flex w-full flex-col gap-2 sm:grid sm:grid-cols-3 sm:gap-4">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger render={<span className="inline-flex w-full" tabIndex={0} />}>
@@ -1985,7 +1985,7 @@ export function QuizStudy({
                 disabled={currentIndex === 0}
               >
                 <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Previous</span>
+                Previous
               </Button>
             </TooltipTrigger>
             <TooltipContent>Go to the previous question</TooltipContent>
@@ -2027,7 +2027,7 @@ export function QuizStudy({
                 onClick={goNext}
                 disabled={currentIndex === totalQuestions - 1}
               >
-                <span className="hidden sm:inline">Next</span>
+                Next
                 <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
             </TooltipTrigger>

@@ -298,23 +298,23 @@ export function StudySession({
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Study Mode
           </p>
-          <TabsList className="h-auto w-full flex-wrap justify-center gap-1 bg-muted/40 p-1">
+          <TabsList className="study-mode-list h-auto w-full max-w-full flex-wrap justify-center gap-1.5 bg-muted/40 p-1">
             {showReviewTab ? (
-              <TabsTrigger value="review" className="min-w-0 flex-1 gap-1.5">
+              <TabsTrigger value="review" className="study-mode-trigger h-auto min-h-10 w-full flex-none gap-1.5 px-3 py-2 sm:w-auto">
                 <span aria-hidden>📖</span>
                 Standard Review
               </TabsTrigger>
             ) : null}
 
             {showAiRecallTab ? (
-              <TabsTrigger value="ai_recall" className="min-w-0 flex-1 gap-1.5">
+              <TabsTrigger value="ai_recall" className="study-mode-trigger h-auto min-h-10 w-full flex-none gap-1.5 px-3 py-2 sm:w-auto">
                 <span aria-hidden>🤖</span>
                 AI Recall™
               </TabsTrigger>
             ) : null}
 
             {showQuizTab ? (
-              <TabsTrigger value="quiz" className="min-w-0 flex-1 gap-1.5">
+              <TabsTrigger value="quiz" className="study-mode-trigger h-auto min-h-10 w-full flex-none gap-1.5 px-3 py-2 sm:w-auto">
                 <ListChecks className="h-3.5 w-3.5" />
                 Quiz
               </TabsTrigger>
@@ -325,7 +325,7 @@ export function StudySession({
                     <TabsTrigger
                       value="quiz"
                       disabled
-                      className="min-w-0 flex-1 gap-1.5 opacity-40"
+                      className="study-mode-trigger h-auto min-h-10 w-full flex-none gap-1.5 px-3 py-2 opacity-40 sm:w-auto"
                     />
                   }
                 >

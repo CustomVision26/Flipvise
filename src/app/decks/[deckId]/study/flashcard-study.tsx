@@ -427,7 +427,7 @@ export function FlashcardStudy({
                     disabled={autoShuffle}
                   >
                     <Shuffle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    <span className="hidden sm:inline">Shuffle</span>
+                    Shuffle
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -559,7 +559,7 @@ export function FlashcardStudy({
             >
             <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0">
               <Badge variant="secondary" className={cn("text-xs", hasGradient && !illustratedFace && "bg-white/20 text-white border-white/30", illustratedFace && "bg-violet-100 text-violet-900")}>Front</Badge>
-              <span className={cn("text-xs hidden sm:inline", illustratedFace ? "text-slate-600" : hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to reveal answer</span>
+              <span className={cn("text-xs", illustratedFace ? "text-slate-600" : hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to reveal answer</span>
             </div>
             {illustratedFace && !currentCard.frontImageUrl && (currentCard.front?.length ?? 0) < 220 ? (
               <div className="study-art-arrive relative mx-4 h-36 shrink-0 overflow-hidden rounded-xl sm:mx-6 sm:h-44" aria-hidden>
@@ -645,7 +645,7 @@ export function FlashcardStudy({
             ) : null}
             <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0 relative z-10">
               <Badge variant="outline" className={cn("text-xs", hasGradient && !illustratedFace && "bg-white/20 text-white border-white/30", illustratedFace && "border-violet-200 bg-violet-100 text-violet-900")}>Back</Badge>
-              <span className={cn("text-xs hidden sm:inline", illustratedFace ? "text-slate-600" : hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to flip back</span>
+              <span className={cn("text-xs", illustratedFace ? "text-slate-600" : hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to flip back</span>
             </div>
             {currentCard.backImageUrl && (
               <div className="shrink-0 px-3 sm:px-6 pb-2 relative z-10">
@@ -722,7 +722,7 @@ export function FlashcardStudy({
 
       {/* Navigation controls — flip to reveal, then Next (no self-grading). */}
       <div className="study-contrast-controls flex flex-col items-center gap-2 sm:gap-3">
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:gap-3">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger render={<span className="inline-flex" tabIndex={0} />}>
@@ -734,7 +734,7 @@ export function FlashcardStudy({
                   disabled={currentIndex === 0}
                 >
                   <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Previous</span>
+                  Previous
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Go to the previous card</TooltipContent>
@@ -774,7 +774,7 @@ export function FlashcardStudy({
                   />
                 }
               >
-                <span className="hidden sm:inline">
+                <span>
                   {currentIndex === total - 1 ? "Finish" : "Next"}
                 </span>
                 <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />

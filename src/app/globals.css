@@ -2180,15 +2180,75 @@ html[data-flipvise-native-shell] [data-app-header].has-team-admin [data-header-t
   justify-content: center;
 }
 
-/* Phone header: logo, then the add-on banner on its own row, then account tools. */
+/* Phone header: logo and account tools share the top row; the add-on banner runs underneath. */
+html[data-flipvise-native-shell] [data-app-header] {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "brand tools"
+    "banner banner"
+    "workspace workspace";
+  align-items: center;
+  column-gap: 0.4rem;
+  row-gap: 0.4rem;
+}
+
+html[data-flipvise-native-shell] [data-header-brand] {
+  grid-area: brand;
+}
+
+html[data-flipvise-native-shell] .header-brand-logo {
+  height: 2.5rem !important;
+}
+
+html[data-flipvise-native-shell] [data-header-user],
+html[data-flipvise-native-shell] [data-header-user-section] {
+  display: contents !important;
+}
+
+html[data-flipvise-native-shell] [data-header-tools] {
+  grid-area: tools;
+  width: auto;
+  max-width: 100%;
+  margin-left: 0;
+  justify-self: end;
+  gap: 0.15rem;
+  padding: 0.15rem 0.25rem;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+html[data-flipvise-native-shell] [data-header-tools] .header-plans-pill,
+html[data-flipvise-native-shell] [data-header-icon-tools] [data-slot="button"][data-size="icon"],
+html[data-flipvise-native-shell] [data-header-tools] .header-guides-pill {
+  width: 1.9rem !important;
+  height: 1.9rem !important;
+  min-width: 1.9rem !important;
+  padding-inline: 0 !important;
+}
+
+html[data-flipvise-native-shell] [data-header-tools] .header-plan-badge {
+  width: auto !important;
+  height: 1.9rem !important;
+  min-width: 0 !important;
+  padding-inline: 0.45rem !important;
+  font-size: 0.68rem !important;
+}
+
+html[data-flipvise-native-shell] [data-header-workspace] {
+  grid-area: workspace;
+  width: 100%;
+  max-width: 100%;
+  justify-content: stretch;
+}
+
 html[data-flipvise-native-shell] [data-header-brand] [data-header-pills] {
   display: none !important;
 }
 
 html[data-flipvise-native-shell] [data-app-header] > [data-header-pills] {
   display: flex !important;
-  flex: 1 1 100%;
-  order: 2;
+  grid-area: banner;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -2197,50 +2257,35 @@ html[data-flipvise-native-shell] [data-app-header] > [data-header-pills] {
   box-sizing: border-box;
 }
 
-html[data-flipvise-native-shell] [data-addons-banner="header"] {
+html[data-flipvise-native-shell] [data-addons-banner="header"],
+html[data-flipvise-native-shell][data-platform="android"] [data-addons-banner="header"] {
   width: 100%;
   max-width: 100%;
   overflow: hidden;
 }
 
-html[data-flipvise-native-shell] [data-addons-banner="header"] > div {
+html[data-flipvise-native-shell] [data-addons-banner="header"] > div,
+html[data-flipvise-native-shell][data-platform="android"] [data-addons-banner="header"] .animate-addons-marquee {
   display: flex;
-  width: 100%;
-  max-width: 100%;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  width: max-content;
+  max-width: none;
+  flex-wrap: nowrap;
+  animation: addons-marquee 14s linear infinite;
 }
 
 html[data-flipvise-native-shell] .header-addon-pill {
-  width: 100%;
+  width: auto;
+  flex: 0 0 auto;
   height: 2.15rem;
-  max-width: 100%;
   justify-content: flex-start;
-  padding: 0 0.7rem 0 0.3rem;
+  padding: 0 0.85rem 0 0.3rem;
   font-size: 0.75rem;
 }
 
-html[data-flipvise-native-shell] .header-addon-copy {
-  display: none !important;
-}
-
-html[data-flipvise-native-shell] [data-header-user] {
-  flex: 1 1 100%;
-  order: 3;
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
-  justify-content: flex-start;
-}
-
-html[data-flipvise-native-shell] [data-header-tools] {
-  flex: 1 1 100%;
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
-  order: 0;
-  overflow-x: auto;
-  box-sizing: border-box;
+@media (prefers-reduced-motion: reduce) {
+  html[data-flipvise-native-shell] [data-addons-banner="header"] .animate-addons-marquee {
+    animation: none;
+  }
 }
 
 /* ========================================
@@ -3589,6 +3634,29 @@ html[data-illustrated="on"].dark .personal-dashboard-page .personal-dash-panel .
 html[data-illustrated="on"] .illustrated-study-modes [data-slot="tabs-list"] {
   background: transparent !important;
   box-shadow: none !important;
+}
+
+.illustrated-study-modes .study-mode-list {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.illustrated-study-modes .study-mode-trigger {
+  max-width: 100%;
+  overflow: visible;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+
+@media (max-width: 639px) {
+  .illustrated-study-modes .study-mode-trigger {
+    flex: 1 1 100%;
+    width: 100%;
+  }
 }
 
 html[data-illustrated="on"] .illustrated-study-modes [data-slot="tabs-trigger"] {
