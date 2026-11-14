@@ -11,6 +11,29 @@ import {
 
 const PERSONAL_PRIMARY_LABEL = "Personal Dash";
 
+function artUrl(file: string): string {
+  const base = import.meta.env.BASE_URL || "./";
+  return `${base}artwork/home/${file}`;
+}
+
+function workspaceArtFile(workspace: OfflineWorkspaceContext): string {
+  const name = workspace.name.toLowerCase();
+  const plan = `${workspace.planSlug} ${workspace.planLabel}`.toLowerCase();
+  if (/class|college|university|study group|high school/.test(name)) {
+    return "workspace-class.png";
+  }
+  if (/corp|company|government|business|office/.test(name)) {
+    return "team-corp.png";
+  }
+  if (
+    /elementary|school|academy|primary|kindergarten/.test(name) ||
+    plan.includes("education")
+  ) {
+    return "workspace-school.png";
+  }
+  return "workspace-class.png";
+}
+
 export function WorkspaceSelector({
   scope,
   workspaces,
@@ -220,7 +243,7 @@ export function WorkspaceSelector({
         type="button"
         role="option"
         aria-selected={isActive}
-        className="workspace-scope__item workspace-scope__item--team"
+        className={`workspace-scope__item workspace-scope__item--team${isActive ? " is-active" : ""}`}
         onClick={(e) => {
           if ((e.target as HTMLElement).closest("[data-team-admin-dash-link]")) return;
           selectTeam(w.teamId);
@@ -242,6 +265,11 @@ export function WorkspaceSelector({
             <span>{ownerLabel(w)}</span>
           </span>
         </span>
+        <img
+          className="workspace-scope__art"
+          src={artUrl(workspaceArtFile(w))}
+          alt=""
+        />
         {showToAdminDash ? (
           <button
             data-team-admin-dash-link
@@ -305,7 +333,7 @@ export function WorkspaceSelector({
             type="button"
             role="option"
             aria-selected={scope === "personal"}
-            className="workspace-scope__item"
+            className={`workspace-scope__item${scope === "personal" ? " is-active" : ""}`}
             onClick={selectPersonal}
           >
             <span
@@ -314,13 +342,11 @@ export function WorkspaceSelector({
             >
               ✓
             </span>
-            <span className="workspace-scope__item-line">
+            <span className="workspace-scope__item-body">
               <span className="workspace-scope__item-title">{PERSONAL_PRIMARY_LABEL}</span>
-              <span className="workspace-scope__dot" aria-hidden>
-                ·
-              </span>
               <span className="workspace-scope__item-muted">{personalPlanLabel}</span>
             </span>
+            <img className="workspace-scope__art" src={artUrl("workspace-house.png")} alt="" />
           </button>
         )}
 
@@ -338,6 +364,7 @@ export function WorkspaceSelector({
                     closeMenu();
                   }}
                 >
+                  <img className="workspace-scope__action-art" src={artUrl("workspace-teacher.png")} alt="" />
                   Teacher Dash
                 </button>
               ) : null}
@@ -350,6 +377,7 @@ export function WorkspaceSelector({
                     closeMenu();
                   }}
                 >
+                  <img className="workspace-scope__action-art" src={artUrl("workspace-chart.png")} alt="" />
                   Team Admin Dash
                 </button>
               ) : null}
@@ -379,9 +407,10 @@ export function WorkspaceSelector({
         )}
 
         {workspaces.length === 0 && invitedTeams.length === 0 && (
-          <p className="workspace-scope__empty">
-            Team workspaces appear here after you sync from the online dashboard.
-          </p>
+          <div className="workspace-scope__empty">
+            <img className="workspace-scope__empty-art" src={artUrl("workspace-school.png")} alt="" />
+            <p>Team workspaces appear here after you sync from the online dashboard.</p>
+          </div>
         )}
       </div>
     </div>

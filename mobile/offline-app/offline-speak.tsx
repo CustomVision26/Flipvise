@@ -54,21 +54,66 @@ export function OfflineVoiceSelector({
   voice: OfflineTtsVoice;
   onChange: (v: OfflineTtsVoice) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const current = OFFLINE_TTS_VOICES.find((item) => item.value === voice) ?? OFFLINE_TTS_VOICES[0];
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
-    <label className="offline-voice-select">
-      <span className="sr-only">Voice</span>
-      <select
-        value={voice}
-        onChange={(e) => onChange(e.target.value as OfflineTtsVoice)}
-        aria-label="AI voice"
+    <div className={`offline-voice-select${open ? " offline-voice-select--open" : ""}`} ref={rootRef}>
+      <button
+        type="button"
+        className="offline-voice-select__trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`AI voice, ${current.label}`}
+        onClick={() => setOpen((value) => !value)}
       >
-        {OFFLINE_TTS_VOICES.map((v) => (
-          <option key={v.value} value={v.value}>
-            {v.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        {current.label}
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open ? (
+        <ul className="offline-voice-select__menu" role="listbox" aria-label="AI voice">
+          {OFFLINE_TTS_VOICES.map((item) => {
+            const selected = item.value === voice;
+            return (
+              <li key={item.value}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  className={selected ? "is-selected" : undefined}
+                  onClick={() => {
+                    onChange(item.value);
+                    setOpen(false);
+                  }}
+                >
+                  <span>{item.label}</span>
+                  <span className="offline-voice-select__mark" aria-hidden />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

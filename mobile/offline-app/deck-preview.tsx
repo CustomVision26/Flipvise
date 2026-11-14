@@ -1,12 +1,76 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listCards } from "../../src/lib/offline/repository";
 import type { OfflineCardRow, OfflineDeckRow } from "../../src/lib/offline/schema";
+import { IllustratedArt } from "./illustrated-library";
 import { OfflineImage } from "./offline-image";
 import {
   OfflineSpeakButton,
   OfflineVoiceSelector,
   type OfflineTtsVoice,
 } from "./offline-speak";
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+  const d = direction === "left" ? "M14 6l-6 6 6 6" : "M10 6l6 6-6 6";
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+}
+
+function PreviewHeader({
+  deck,
+  online,
+  subtitle,
+  voice,
+  onVoice,
+  showVoice,
+  onClose,
+}: {
+  deck: OfflineDeckRow;
+  online: boolean;
+  subtitle: string;
+  voice?: OfflineTtsVoice;
+  onVoice?: (voice: OfflineTtsVoice) => void;
+  showVoice?: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div className="deck-preview__header">
+      <IllustratedArt
+        name={deck.name}
+        description={deck.description}
+        coverImageUrl={deck.cover_image_url}
+        topicText={`${deck.name} ${deck.description ?? ""}`}
+        role="hero"
+        displayWidth={84}
+        displayHeight={84}
+        online={online}
+        className="deck-preview__avatar"
+      />
+      <div className="deck-preview__heading">
+        <h2>{deck.name}</h2>
+        <p>{subtitle}</p>
+      </div>
+      <div className="deck-preview__header-actions">
+        {showVoice && voice && onVoice ? (
+          <OfflineVoiceSelector voice={voice} onChange={onVoice} />
+        ) : null}
+        <button type="button" className="deck-preview__close-icon" onClick={onClose} aria-label="Close preview">
+          <CloseIcon />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function cardText(value: string | null, fallback: string): string {
   const t = value?.trim();
@@ -95,15 +159,7 @@ export function DeckPreview({
   if (cards === null) {
     return (
       <div className="deck-preview" role="dialog" aria-modal="true" aria-label={`Preview: ${deck.name}`}>
-        <div className="deck-preview__header">
-          <div className="deck-preview__heading">
-            <h2>{deck.name}</h2>
-            <p>Loading cards…</p>
-          </div>
-          <button type="button" className="deck-preview__close-icon" onClick={onClose} aria-label="Close preview">
-            ✕
-          </button>
-        </div>
+        <PreviewHeader deck={deck} online={online} subtitle="Loading cards…" onClose={onClose} />
         <div className="deck-preview__empty">Loading…</div>
       </div>
     );
@@ -112,22 +168,15 @@ export function DeckPreview({
   if (total === 0) {
     return (
       <div className="deck-preview" role="dialog" aria-modal="true" aria-label={`Preview: ${deck.name}`}>
-        <div className="deck-preview__header">
-          <div className="deck-preview__heading">
-            <h2>{deck.name}</h2>
-            <p>No cards</p>
-          </div>
-          <button type="button" className="deck-preview__close-icon" onClick={onClose} aria-label="Close preview">
-            ✕
-          </button>
-        </div>
+        <PreviewHeader deck={deck} online={online} subtitle="No cards" onClose={onClose} />
         <div className="deck-preview__empty">
           <h3>No cards available</h3>
           <p>Add cards on this device, then return to preview.</p>
         </div>
         <div className="deck-preview__footer">
-          <button type="button" className="btn secondary" onClick={onClose}>
-            ✕ Close Preview
+          <button type="button" className="deck-preview__done" onClick={onClose}>
+            <CloseIcon />
+            Close Preview
           </button>
         </div>
       </div>
@@ -147,42 +196,20 @@ export function DeckPreview({
       aria-modal="true"
       aria-label={`Preview: ${deck.name}`}
     >
-      <div className="deck-preview__header">
-        <div className="deck-preview__heading">
-          <h2>{deck.name}</h2>
-          <p>
-            Card {index + 1} of {total}
-          </p>
-        </div>
-        <div className="deck-preview__header-actions">
-          {showAiControls ? (
-            <OfflineVoiceSelector voice={voice} onChange={setVoice} />
-          ) : null}
-          <button
-            type="button"
-            className="deck-preview__close-icon"
-            onClick={onClose}
-            aria-label="Close preview"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
+      <PreviewHeader
+        deck={deck}
+        online={online}
+        subtitle={`Card ${index + 1} of ${total}`}
+        voice={voice}
+        onVoice={setVoice}
+        showVoice={showAiControls}
+        onClose={onClose}
+      />
       <div className="deck-preview__progress" aria-hidden>
         <div className="deck-preview__progress-fill" style={{ width: `${progress}%` }} />
       </div>
 
       <div className="deck-preview__body">
-        <button
-          type="button"
-          className="deck-preview__nav"
-          onClick={goBack}
-          disabled={index === 0}
-          aria-label="Previous card"
-        >
-          ‹
-        </button>
-
         <div
           className="deck-preview__slide"
           key={animKey}
@@ -223,7 +250,25 @@ export function DeckPreview({
           </div>
 
           <div className="deck-preview__divider">
+            <button
+              type="button"
+              className="deck-preview__nav"
+              onClick={goBack}
+              disabled={index === 0}
+              aria-label="Previous card"
+            >
+              <ChevronIcon direction="left" />
+            </button>
             <span>Answer</span>
+            <button
+              type="button"
+              className="deck-preview__nav"
+              onClick={goNext}
+              disabled={index >= total - 1}
+              aria-label="Next card"
+            >
+              <ChevronIcon direction="right" />
+            </button>
           </div>
 
           <div className="deck-preview__panel deck-preview__panel--answer">
@@ -253,21 +298,12 @@ export function DeckPreview({
             ) : null}
           </div>
         </div>
-
-        <button
-          type="button"
-          className="deck-preview__nav"
-          onClick={goNext}
-          disabled={index >= total - 1}
-          aria-label="Next card"
-        >
-          ›
-        </button>
       </div>
 
       <div className="deck-preview__footer">
-        <button type="button" className="btn secondary" onClick={onClose}>
-          ✕ Close Preview
+        <button type="button" className="deck-preview__done" onClick={onClose}>
+          <CloseIcon />
+          Close Preview
         </button>
       </div>
     </div>

@@ -27,6 +27,7 @@ import { IllustratedOfflineCard } from "./illustrated-library";
 import { ConfirmDialog } from "./confirm-dialog";
 import { OfflineImage } from "./offline-image";
 import { ImagePickerField } from "./image-picker-field";
+import { DisplayMenu } from "./display-menu";
 import { Pagination } from "./pagination";
 
 const CARDS_PER_PAGE = 12;
@@ -43,11 +44,12 @@ function cardBackLabel(card: OfflineCardRow): string {
 
 function sortCards(cards: OfflineCardRow[], sort: OfflineCardSort): OfflineCardRow[] {
   const rows = [...cards];
+  const updated = (row: OfflineCardRow) => Number(row.updated_at_ms) || 0;
   switch (sort) {
     case "updated-desc":
-      return rows.sort((a, b) => b.updated_at_ms - a.updated_at_ms);
+      return rows.sort((a, b) => updated(b) - updated(a));
     case "updated-asc":
-      return rows.sort((a, b) => a.updated_at_ms - b.updated_at_ms);
+      return rows.sort((a, b) => updated(a) - updated(b));
     case "front-asc":
       return rows.sort((a, b) =>
         cardFrontLabel(a).localeCompare(cardFrontLabel(b)),
@@ -61,86 +63,6 @@ function sortCards(cards: OfflineCardRow[], sort: OfflineCardSort): OfflineCardR
     case "back-desc":
       return rows.sort((a, b) => cardBackLabel(b).localeCompare(cardBackLabel(a)));
   }
-}
-
-function CardViewSortSheet({
-  view,
-  sort,
-  onView,
-  onSort,
-  onClose,
-}: {
-  view: OfflineCardViewMode;
-  sort: OfflineCardSort;
-  onView: (v: OfflineCardViewMode) => void;
-  onSort: (s: OfflineCardSort) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div
-        className="sheet sheet--menu"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="card-display-title"
-      >
-        <div className="sheet-head">
-          <h2 id="card-display-title">Display and sort</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-
-        <p className="sheet-section-label" id="card-view-label">View</p>
-        <div className="option-list" role="radiogroup" aria-labelledby="card-view-label">
-          {(Object.keys(CARD_VIEW_LABELS) as OfflineCardViewMode[]).map((mode) => {
-            const active = mode === view;
-            return (
-              <button
-                key={mode}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                className={`option-row${active ? " active" : ""}`}
-                onClick={() => onView(mode)}
-              >
-                <span>
-                  <strong>{CARD_VIEW_LABELS[mode].title}</strong>
-                  <small>{CARD_VIEW_LABELS[mode].hint}</small>
-                </span>
-                <span className="option-mark" aria-hidden />
-              </button>
-            );
-          })}
-        </div>
-
-        <p className="sheet-section-label" id="card-sort-label">Sort</p>
-        <div className="option-list" role="radiogroup" aria-labelledby="card-sort-label">
-          {(Object.keys(CARD_SORT_LABELS) as OfflineCardSort[]).map((key) => {
-            const active = key === sort;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                className={`option-row${active ? " active" : ""}`}
-                onClick={() => onSort(key)}
-              >
-                <span>
-                  <strong>{CARD_SORT_LABELS[key]}</strong>
-                </span>
-                <span className="option-mark" aria-hidden />
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function CardAnswerDialog({
@@ -403,7 +325,6 @@ export function DeckDetail({
   const [cards, setCards] = useState<OfflineCardRow[] | null>(null);
   const [view, setView] = useState<OfflineCardViewMode>(() => loadCardViewMode());
   const [sort, setSort] = useState<OfflineCardSort>(() => loadCardSort());
-  const [showOptions, setShowOptions] = useState(false);
   const [answerPreview, setAnswerPreview] = useState<OfflineCardRow | null>(null);
   const [editingCard, setEditingCard] = useState<OfflineCardRow | null>(null);
   const [deletingCard, setDeletingCard] = useState<OfflineCardRow | null>(null);
@@ -555,14 +476,23 @@ export function DeckDetail({
               <p className="library-count">
                 {sorted.length} card{sorted.length === 1 ? "" : "s"}
               </p>
-              <button
-                type="button"
-                className="btn secondary btn--sm"
-                onClick={() => setShowOptions(true)}
-              >
-                {CARD_VIEW_LABELS[view].title} ·{" "}
-                {CARD_SORT_LABELS[sort].split(" ")[0]}…
-              </button>
+              <DisplayMenu
+                view={view}
+                sort={sort}
+                viewLabel={CARD_VIEW_LABELS[view].title}
+                sortLabel={CARD_SORT_LABELS[sort]}
+                views={(Object.keys(CARD_VIEW_LABELS) as OfflineCardViewMode[]).map((mode) => ({
+                  value: mode,
+                  title: CARD_VIEW_LABELS[mode].title,
+                  hint: CARD_VIEW_LABELS[mode].hint,
+                }))}
+                sorts={(Object.keys(CARD_SORT_LABELS) as OfflineCardSort[]).map((key) => ({
+                  value: key,
+                  title: CARD_SORT_LABELS[key],
+                }))}
+                onView={changeView}
+                onSort={changeSort}
+              />
             </div>
             <div className={containerClass}>
               {pagedCards.map((card) => (
@@ -589,16 +519,6 @@ export function DeckDetail({
               label="Card pages"
             />
           </>
-        )}
-
-        {showOptions && (
-          <CardViewSortSheet
-            view={view}
-            sort={sort}
-            onView={changeView}
-            onSort={changeSort}
-            onClose={() => setShowOptions(false)}
-          />
         )}
 
         {answerPreview ? (

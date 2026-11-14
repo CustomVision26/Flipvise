@@ -1,14 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { LayoutGrid, List, Rows3, Check, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
   DropdownMenuItem,
-  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -70,11 +71,22 @@ export function ViewModeDropdown<T extends string = string>({
   const activeView =
     VIEW_OPTIONS.find((o) => o.value === view) ?? VIEW_OPTIONS[0];
   const ActiveViewIcon = activeView.icon;
-  const showSort =
-    sort !== undefined &&
-    onSortChange !== undefined &&
-    sortOptions !== undefined &&
-    sortOptions.length > 0;
+  const sortMenu =
+    sort !== undefined && onSortChange && sortOptions && sortOptions.length > 0
+      ? { sort, onSortChange, sortOptions }
+      : null;
+  const activeSort = sortMenu?.sortOptions.find(
+    (option) => option.value === sortMenu.sort,
+  )?.label;
+  const [submenuSide, setSubmenuSide] = useState<"left" | "bottom">("left");
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 639px)");
+    const apply = () => setSubmenuSide(query.matches ? "bottom" : "left");
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
 
   return (
     <DropdownMenu>
@@ -97,69 +109,81 @@ export function ViewModeDropdown<T extends string = string>({
             />
           </TooltipTrigger>
           <TooltipContent>
-            Change layout{showSort ? " or sort order" : ""}
+            Change layout{sortMenu ? " or sort order" : ""}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
-            View as
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {VIEW_OPTIONS.map((opt) => {
-            const Icon = opt.icon;
-            const isActive = opt.value === view;
-            return (
-              <DropdownMenuItem
-                key={opt.value}
-                onClick={() => onViewChange(opt.value)}
-                className="gap-2.5 cursor-pointer"
-              >
-                <Icon
-                  className={cn(
-                    "size-4 shrink-0",
-                    isActive ? "text-foreground" : "text-muted-foreground",
-                  )}
-                />
-                <div className="flex flex-1 flex-col">
-                  <span className="text-sm leading-none">{opt.label}</span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {opt.description}
-                  </span>
-                </div>
-                {isActive && (
-                  <Check className="size-3.5 text-foreground shrink-0" />
-                )}
-              </DropdownMenuItem>
-            );
-          })}
-        </DropdownMenuGroup>
-
-        {showSort && (
-          <DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <ArrowUpDown className="size-3" />
-              Sort by
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {sortOptions!.map((opt) => {
-              const isActive = opt.value === sort;
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-2">
+            <ActiveViewIcon className="size-4 shrink-0 text-foreground" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-sm leading-none">View as</span>
+              <span className="text-[11px] text-muted-foreground">
+                {activeView.label}
+              </span>
+            </span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent side={submenuSide} className="w-56">
+            {VIEW_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              const isActive = opt.value === view;
               return (
                 <DropdownMenuItem
                   key={opt.value}
-                  onClick={() => onSortChange!(opt.value)}
-                  className="gap-2.5 cursor-pointer"
+                  onClick={() => onViewChange(opt.value)}
+                  className="cursor-pointer gap-2.5"
                 >
-                  <span className="flex-1 text-sm">{opt.label}</span>
+                  <Icon
+                    className={cn(
+                      "size-4 shrink-0",
+                      isActive ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm leading-none">{opt.label}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {opt.description}
+                    </span>
+                  </span>
                   {isActive && (
-                    <Check className="size-3.5 text-foreground shrink-0" />
+                    <Check className="size-3.5 shrink-0 text-foreground" />
                   )}
                 </DropdownMenuItem>
               );
             })}
-          </DropdownMenuGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+
+        {sortMenu && (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-2">
+              <ArrowUpDown className="size-4 shrink-0 text-foreground" />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-sm leading-none">Sort by</span>
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {activeSort}
+                </span>
+              </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent side={submenuSide} className="w-56">
+              {sortMenu.sortOptions.map((opt) => {
+                const isActive = opt.value === sortMenu.sort;
+                return (
+                  <DropdownMenuItem
+                    key={opt.value}
+                    onClick={() => sortMenu.onSortChange(opt.value)}
+                    className="cursor-pointer gap-2.5"
+                  >
+                    <span className="flex-1 text-sm">{opt.label}</span>
+                    {isActive && (
+                      <Check className="size-3.5 shrink-0 text-foreground" />
+                    )}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

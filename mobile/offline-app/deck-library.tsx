@@ -21,6 +21,7 @@ import { WorkspaceSelector } from "./workspace-selector";
 import { IllustratedOfflineDeck } from "./illustrated-library";
 import { ConfirmDialog } from "./confirm-dialog";
 import { ImagePickerField } from "./image-picker-field";
+import { DisplayMenu } from "./display-menu";
 import { Pagination } from "./pagination";
 
 const DECKS_PER_PAGE = 12;
@@ -70,19 +71,23 @@ function sortDecks(
   sort: OfflineDeckSort,
 ): DeckWithCount[] {
   const rows = [...decks];
+  const updated = (row: DeckWithCount) => Number(row.updated_at_ms) || 0;
+  const count = (row: DeckWithCount) => Number(row.cardCount) || 0;
+  const byName = (a: DeckWithCount, b: DeckWithCount) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   switch (sort) {
     case "updated-desc":
-      return rows.sort((a, b) => b.updated_at_ms - a.updated_at_ms);
+      return rows.sort((a, b) => updated(b) - updated(a));
     case "updated-asc":
-      return rows.sort((a, b) => a.updated_at_ms - b.updated_at_ms);
+      return rows.sort((a, b) => updated(a) - updated(b));
     case "name-asc":
-      return rows.sort((a, b) => a.name.localeCompare(b.name));
+      return rows.sort(byName);
     case "name-desc":
-      return rows.sort((a, b) => b.name.localeCompare(a.name));
+      return rows.sort((a, b) => byName(b, a));
     case "cards-desc":
-      return rows.sort((a, b) => b.cardCount - a.cardCount);
+      return rows.sort((a, b) => count(b) - count(a));
     case "cards-asc":
-      return rows.sort((a, b) => a.cardCount - b.cardCount);
+      return rows.sort((a, b) => count(a) - count(b));
   }
 }
 
@@ -214,86 +219,6 @@ function EditDeckSheet({
   );
 }
 
-function ViewSortSheet({
-  view,
-  sort,
-  onView,
-  onSort,
-  onClose,
-}: {
-  view: OfflineDeckViewMode;
-  sort: OfflineDeckSort;
-  onView: (v: OfflineDeckViewMode) => void;
-  onSort: (s: OfflineDeckSort) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div
-        className="sheet sheet--menu"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="deck-display-title"
-      >
-        <div className="sheet-head">
-          <h2 id="deck-display-title">Display and sort</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-
-        <p className="sheet-section-label" id="deck-view-label">View</p>
-        <div className="option-list" role="radiogroup" aria-labelledby="deck-view-label">
-          {(Object.keys(VIEW_LABELS) as OfflineDeckViewMode[]).map((mode) => {
-            const active = mode === view;
-            return (
-              <button
-                key={mode}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                className={`option-row${active ? " active" : ""}`}
-                onClick={() => onView(mode)}
-              >
-                <span>
-                  <strong>{VIEW_LABELS[mode].title}</strong>
-                  <small>{VIEW_LABELS[mode].hint}</small>
-                </span>
-                <span className="option-mark" aria-hidden />
-              </button>
-            );
-          })}
-        </div>
-
-        <p className="sheet-section-label" id="deck-sort-label">Sort</p>
-        <div className="option-list" role="radiogroup" aria-labelledby="deck-sort-label">
-          {(Object.keys(SORT_LABELS) as OfflineDeckSort[]).map((key) => {
-            const active = key === sort;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                className={`option-row${active ? " active" : ""}`}
-                onClick={() => onSort(key)}
-              >
-                <span>
-                  <strong>{SORT_LABELS[key]}</strong>
-                </span>
-                <span className="option-mark" aria-hidden />
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function DeckLibrary({
   decks,
   loading = false,
@@ -343,7 +268,6 @@ export function DeckLibrary({
 }) {
   const [view, setView] = useState<OfflineDeckViewMode>(() => loadDeckViewMode());
   const [sort, setSort] = useState<OfflineDeckSort>(() => loadDeckSort());
-  const [showOptions, setShowOptions] = useState(false);
   const [editingDeck, setEditingDeck] = useState<OfflineDeckRow | null>(null);
   const [deletingDeck, setDeletingDeck] = useState<OfflineDeckRow | null>(null);
   const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
@@ -513,13 +437,23 @@ export function DeckLibrary({
           <p className="library-count">
             {sorted.length} deck{sorted.length === 1 ? "" : "s"}
           </p>
-          <button
-            type="button"
-            className="btn secondary btn--sm"
-            onClick={() => setShowOptions(true)}
-          >
-            {VIEW_LABELS[view].title} · {SORT_LABELS[sort].split(" ")[0]}…
-          </button>
+          <DisplayMenu
+            view={view}
+            sort={sort}
+            viewLabel={VIEW_LABELS[view].title}
+            sortLabel={SORT_LABELS[sort]}
+            views={(Object.keys(VIEW_LABELS) as OfflineDeckViewMode[]).map((mode) => ({
+              value: mode,
+              title: VIEW_LABELS[mode].title,
+              hint: VIEW_LABELS[mode].hint,
+            }))}
+            sorts={(Object.keys(SORT_LABELS) as OfflineDeckSort[]).map((key) => ({
+              value: key,
+              title: SORT_LABELS[key],
+            }))}
+            onView={changeView}
+            onSort={changeSort}
+          />
         </div>
       )}
 
@@ -574,16 +508,6 @@ export function DeckLibrary({
             label="Deck pages"
           />
         </>
-      )}
-
-      {showOptions && (
-        <ViewSortSheet
-          view={view}
-          sort={sort}
-          onView={changeView}
-          onSort={changeSort}
-          onClose={() => setShowOptions(false)}
-        />
       )}
 
       {editingDeck && (
