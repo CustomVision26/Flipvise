@@ -2981,6 +2981,16 @@ button.illustrated-face {
   background: #fff8ee;
 }
 
+/* Interface color fills the open card background around the artwork. Neutral
+   stays cream. The illustration itself is unchanged. */
+html[data-ui-theme] .illustrated-deck-art {
+  background: color-mix(in oklab, var(--accent) 34%, #fff8ee);
+}
+
+html[data-theme="dark"][data-ui-theme] .illustrated-deck-art {
+  background: color-mix(in oklab, var(--accent) 78%, #fff8ee);
+}
+
 .illustrated-deck-art {
   height: 11rem;
 }
