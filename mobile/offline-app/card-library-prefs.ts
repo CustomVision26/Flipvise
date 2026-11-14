@@ -65,10 +65,10 @@ export const CARD_VIEW_LABELS: Record<
   OfflineCardViewMode,
   { title: string; hint: string }
 > = {
-  detail: { title: "Detail", hint: "Front, back, and updated date" },
-  grid: { title: "Grid", hint: "Two-column cards" },
-  list: { title: "List", hint: "Compact single-line rows" },
-  thumbnail: { title: "Thumbnail", hint: "Small visual tiles" },
+  detail: { title: "Detail", hint: "Question, answer, and date" },
+  grid: { title: "Grid", hint: "Illustrated cards" },
+  list: { title: "List", hint: "One card per row" },
+  thumbnail: { title: "Thumbnail", hint: "Small picture tiles" },
 };
 
 export const CARD_SORT_LABELS: Record<OfflineCardSort, string> = {

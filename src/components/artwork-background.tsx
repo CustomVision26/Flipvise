@@ -17,6 +17,7 @@ import {
   selectArtworkScene,
   type ArtworkScene,
 } from "@/lib/artwork-background";
+import { persistNativeArtworkSchedule } from "@/lib/native-artwork-schedule";
 
 /**
  * Decorative backdrop. Light and dark swap with the theme. When Change
@@ -62,6 +63,16 @@ export function ArtworkBackground() {
     : null;
 
   const src = scene && theme ? artworkBackgroundPath(scene, theme) : null;
+
+  React.useEffect(() => {
+    if (!baseScene) return;
+    void persistNativeArtworkSchedule({
+      enabled: rotating,
+      hours: appearance.backgroundChangeHours,
+      startedAt,
+      scene: baseScene,
+    });
+  }, [baseScene, rotating, appearance.backgroundChangeHours, startedAt]);
 
   React.useEffect(() => {
     if (!src) {

@@ -47,15 +47,7 @@ export function NativeNotificationBootstrap() {
 
     let detachPushHandlers: (() => void) | undefined;
     let stopInboxPoller: (() => void) | undefined;
-    let appStateListener: { remove: () => void } | undefined;
     let cancelled = false;
-
-    const runUpdates = () => {
-      if (cancelled) return;
-      void runNativeUpdateChecks({
-        onStoreUpdate: (prompt) => setStorePrompt(prompt),
-      });
-    };
 
     void (async () => {
       if (isSignedIn) {
@@ -73,29 +65,53 @@ export function NativeNotificationBootstrap() {
 
         stopInboxPoller = startNativeInboxPoller(() => !cancelled && !!isSignedIn);
       }
-
-      try {
-        const { Capacitor } = await import("@capacitor/core");
-        if (Capacitor.isNativePlatform()) {
-          const { App } = await import("@capacitor/app");
-          appStateListener = await App.addListener("appStateChange", ({ isActive }) => {
-            if (isActive) runUpdates();
-          });
-        }
-      } catch {
-        // Bridge unavailable on live-site WebView — update checks still run once below.
-      }
-
-      runUpdates();
     })();
 
     return () => {
       cancelled = true;
       detachPushHandlers?.();
       stopInboxPoller?.();
-      void appStateListener?.remove();
     };
   }, [mounted, isNativeShell, isSignedIn]);
+
+  React.useEffect(() => {
+    if (!mounted || !isNativeShell) return;
+
+    const path = window.location.pathname;
+    if (path.startsWith("/native-signin") || path.startsWith("/auth/")) {
+      return;
+    }
+
+    let cancelled = false;
+    let appStateListener: { remove: () => void } | undefined;
+
+    const runUpdates = () => {
+      if (cancelled) return;
+      void runNativeUpdateChecks({
+        onStoreUpdate: (prompt) => setStorePrompt(prompt),
+      });
+    };
+
+    void (async () => {
+      try {
+        const { Capacitor } = await import("@capacitor/core");
+        if (!Capacitor.isNativePlatform()) return;
+        const { App } = await import("@capacitor/app");
+        appStateListener = await App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive) runUpdates();
+        });
+      } catch {
+        // Bridge unavailable on the live-site WebView.
+      }
+    })();
+
+    runUpdates();
+
+    return () => {
+      cancelled = true;
+      void appStateListener?.remove();
+    };
+  }, [mounted, isNativeShell]);
 
   React.useEffect(() => {
     if (!mounted || !isNativeShell) return;

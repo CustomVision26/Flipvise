@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import react from "@vitejs/plugin-react-swc";
 import { defineConfig } from "vite";
@@ -27,6 +28,24 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    {
+      name: "copy-illustrated-assets",
+      apply: "build",
+      closeBundle() {
+        const srcRoot = path.resolve(__dirname, "..", "public", "illustrated");
+        const destRoot = path.resolve(__dirname, "www", "illustrated");
+        fs.mkdirSync(destRoot, { recursive: true });
+        for (const folder of ["heroes", "topics"]) {
+          fs.cpSync(path.join(srcRoot, folder), path.join(destRoot, folder), {
+            recursive: true,
+          });
+        }
+        for (const file of fs.readdirSync(srcRoot)) {
+          if (!file.endsWith(".png")) continue;
+          fs.copyFileSync(path.join(srcRoot, file), path.join(destRoot, file));
+        }
+      },
+    },
     {
       name: "flipvise-capacitor-html",
       apply: "build",

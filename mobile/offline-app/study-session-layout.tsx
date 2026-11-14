@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ConnectionStatusPill } from "./connection-status";
 import { DeckWorkspaceContext, type DeckWorkspaceInfo } from "./deck-workspace-context";
+import { IllustratedArt } from "./illustrated-library";
 
 export function StudySessionLayout({
   modeLabel,
@@ -11,6 +12,7 @@ export function StudySessionLayout({
   workspaceInfo,
   progressCurrent,
   progressTotal,
+  variant = "session",
   children,
   footer,
 }: {
@@ -22,6 +24,8 @@ export function StudySessionLayout({
   workspaceInfo?: DeckWorkspaceInfo;
   progressCurrent?: number;
   progressTotal?: number;
+  /** Results hides the deck panel so the score artwork can lead. */
+  variant?: "session" | "results";
   children: ReactNode;
   footer?: ReactNode;
 }) {
@@ -37,38 +41,60 @@ export function StudySessionLayout({
     <div className="app study-session">
       <header className="study-session__header">
         <div className="study-session__top-row">
-          <button type="button" className="btn secondary btn--sm" onClick={onBack}>
-            {backLabel ?? "← Back"}
+          <button type="button" className="study-nav-btn" onClick={onBack} aria-label={backLabel ?? "Back"}>
+            <svg className="study-icon" viewBox="0 0 24 24" aria-hidden>
+              <path
+                d="M15 6 L9 12 L15 18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
           {online != null ? <ConnectionStatusPill online={online} compact /> : null}
         </div>
-        {workspaceInfo ? <DeckWorkspaceContext info={workspaceInfo} compact /> : null}
-        <div className="study-session__heading">
-          <span className="study-session__badge">{modeLabel}</span>
-          <h1 className="study-session__title">{deckName}</h1>
-        </div>
-        {showProgress ? (
-          <div className="study-session__progress-wrap">
-            <div className="study-session__progress-meta">
-              <span className="study-session__progress-label">Progress</span>
-              <span className="study-session__progress-count">
-                {progressCurrent} of {progressTotal}
-              </span>
+        {variant === "results" ? null : <div className="study-session__panel">
+          {workspaceInfo ? <DeckWorkspaceContext info={workspaceInfo} compact /> : null}
+          <div className="study-session__identity">
+            <div className="study-session__heading">
+              <span className="study-session__badge">{modeLabel}</span>
+              <h1 className="study-session__title">{deckName}</h1>
             </div>
-            <div
-              className="study-session__progress-track"
-              role="progressbar"
-              aria-valuenow={progressCurrent}
-              aria-valuemin={1}
-              aria-valuemax={progressTotal}
-            >
-              <div
-                className="study-session__progress-fill"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
+            <IllustratedArt
+              name={deckName}
+              topicText={deckName}
+              role="hero"
+              displayWidth={160}
+              displayHeight={160}
+              online={online ?? true}
+              className="study-session__art"
+            />
           </div>
-        ) : null}
+          {showProgress ? (
+            <div className="study-session__progress-wrap">
+              <div className="study-session__progress-meta">
+                <span className="study-session__progress-label">Progress</span>
+                <span className="study-session__progress-count">
+                  {progressCurrent} of {progressTotal}
+                </span>
+              </div>
+              <div
+                className="study-session__progress-track"
+                role="progressbar"
+                aria-valuenow={progressCurrent}
+                aria-valuemin={1}
+                aria-valuemax={progressTotal}
+              >
+                <div
+                  className="study-session__progress-fill"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>}
       </header>
       <main className="study-session__body">{children}</main>
       {footer ? <footer className="study-session__footer">{footer}</footer> : null}

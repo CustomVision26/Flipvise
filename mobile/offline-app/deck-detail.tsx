@@ -4,7 +4,6 @@ import {
   useState,
   type CSSProperties,
   type FormEvent,
-  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { deleteCard, listCards, updateCard } from "../../src/lib/offline/repository";
 import type { OfflineCardRow, OfflineDeckRow } from "../../src/lib/offline/schema";
@@ -24,21 +23,13 @@ import {
   resolveDeckWorkspaceInfo,
   type DeckWorkspaceContextInput,
 } from "./deck-workspace-context";
-import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
+import { IllustratedOfflineCard } from "./illustrated-library";
 import { ConfirmDialog } from "./confirm-dialog";
 import { OfflineImage } from "./offline-image";
 import { ImagePickerField } from "./image-picker-field";
 import { Pagination } from "./pagination";
 
 const CARDS_PER_PAGE = 12;
-
-function formatUpdated(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function cardFrontLabel(card: OfflineCardRow): string {
   const t = card.front?.trim();
@@ -87,22 +78,32 @@ function CardViewSortSheet({
 }) {
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet sheet--menu" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="sheet sheet--menu"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="card-display-title"
+      >
         <div className="sheet-head">
-          <h2>Display &amp; sort</h2>
+          <h2 id="card-display-title">Display and sort</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            ×
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
           </button>
         </div>
 
-        <p className="sheet-section-label">View as</p>
-        <div className="option-list">
+        <p className="sheet-section-label" id="card-view-label">View</p>
+        <div className="option-list" role="radiogroup" aria-labelledby="card-view-label">
           {(Object.keys(CARD_VIEW_LABELS) as OfflineCardViewMode[]).map((mode) => {
             const active = mode === view;
             return (
               <button
                 key={mode}
                 type="button"
+                role="radio"
+                aria-checked={active}
                 className={`option-row${active ? " active" : ""}`}
                 onClick={() => onView(mode)}
               >
@@ -110,27 +111,29 @@ function CardViewSortSheet({
                   <strong>{CARD_VIEW_LABELS[mode].title}</strong>
                   <small>{CARD_VIEW_LABELS[mode].hint}</small>
                 </span>
-                {active && <span className="check">✓</span>}
+                <span className="option-mark" aria-hidden />
               </button>
             );
           })}
         </div>
 
-        <p className="sheet-section-label">Sort by</p>
-        <div className="option-list">
+        <p className="sheet-section-label" id="card-sort-label">Sort</p>
+        <div className="option-list" role="radiogroup" aria-labelledby="card-sort-label">
           {(Object.keys(CARD_SORT_LABELS) as OfflineCardSort[]).map((key) => {
             const active = key === sort;
             return (
               <button
                 key={key}
                 type="button"
+                role="radio"
+                aria-checked={active}
                 className={`option-row${active ? " active" : ""}`}
                 onClick={() => onSort(key)}
               >
                 <span>
                   <strong>{CARD_SORT_LABELS[key]}</strong>
                 </span>
-                {active && <span className="check">✓</span>}
+                <span className="option-mark" aria-hidden />
               </button>
             );
           })}
@@ -236,9 +239,10 @@ function CardHoverPopover({
 }
 
 function CardTile({
+  deckName,
+  deckDescription,
   card,
   view,
-  index,
   online,
   canEdit,
   onOpenAnswer,
@@ -247,9 +251,10 @@ function CardTile({
   onHoverStart,
   onHoverEnd,
 }: {
+  deckName: string;
+  deckDescription: string | null;
   card: OfflineCardRow;
   view: OfflineCardViewMode;
-  index: number;
   online: boolean;
   canEdit: boolean;
   onOpenAnswer: (card: OfflineCardRow) => void;
@@ -259,120 +264,29 @@ function CardTile({
   onHoverEnd?: () => void;
 }) {
   const front = cardFrontLabel(card);
-  const updated = formatUpdated(card.updated_at_ms);
-  const hoverProps = onHoverStart
-    ? {
-        onMouseEnter: (e: ReactMouseEvent<HTMLDivElement>) =>
-          onHoverStart(card, e.currentTarget),
-        onMouseLeave: () => onHoverEnd?.(),
-      }
-    : {};
-  const frontImage = card.front_image_url ? (
-    <OfflineImage
-      src={card.front_image_url}
-      alt=""
-      className="card-tile__media"
+  return (
+    <IllustratedOfflineCard
+      deckName={deckName}
+      deckDescription={deckDescription}
+      localId={card.local_id}
+      front={front}
+      cardType={card.card_type}
+      frontImageUrl={card.front_image_url}
+      variantIndex={card.server_id}
+      updatedAtMs={card.updated_at_ms}
       online={online}
-    />
-  ) : null;
-  const actions = canEdit ? (
-    <LibraryTileActions
+      compact={view === "thumbnail"}
+      canEdit={canEdit}
+      onOpen={() => onOpenAnswer(card)}
       onEdit={() => onEdit(card)}
       onDelete={() => onDelete(card)}
+      onMouseEnter={
+        onHoverStart
+          ? (event) => onHoverStart(card, event.currentTarget)
+          : undefined
+      }
+      onMouseLeave={onHoverEnd}
     />
-  ) : null;
-
-  if (view === "list") {
-    return (
-      <div
-        className="card-tile-shell card-tile list card-tile--interactive"
-        {...hoverProps}
-      >
-        <LibraryTileWatermark label="Card" />
-        <button
-          type="button"
-          className="card-tile__open"
-          onClick={() => onOpenAnswer(card)}
-          aria-label={`Question: ${front}. Tap to reveal answer.`}
-        >
-          {frontImage}
-          <span className="card-tile__front">{front}</span>
-        </button>
-        {actions}
-      </div>
-    );
-  }
-
-  if (view === "thumbnail") {
-    return (
-      <div
-        className="card-tile-shell card-tile thumbnail card-tile--interactive"
-        {...hoverProps}
-      >
-        <LibraryTileWatermark label="Card" />
-        <button
-          type="button"
-          className="card-tile__open"
-          onClick={() => onOpenAnswer(card)}
-          aria-label={`Question: ${front}. Tap to reveal answer.`}
-        >
-          {frontImage}
-          <span className="card-tile__thumb-front">{front}</span>
-        </button>
-        {actions}
-      </div>
-    );
-  }
-
-  if (view === "grid") {
-    return (
-      <div
-        className="card-tile-shell card-tile grid card-tile--interactive"
-        {...hoverProps}
-      >
-        <LibraryTileWatermark label="Card" />
-        <button
-          type="button"
-          className="card-tile__open"
-          onClick={() => onOpenAnswer(card)}
-          aria-label={`Question: ${front}. Tap to reveal answer.`}
-        >
-          <p className="card-tile__label">Question</p>
-          {frontImage}
-          <p className="card-tile__front">{front}</p>
-        </button>
-        {actions}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="card-tile-shell card-tile detail card-tile--interactive"
-      {...hoverProps}
-    >
-      <LibraryTileWatermark label="Card" />
-      <button
-        type="button"
-        className="card-tile__open"
-        onClick={() => onOpenAnswer(card)}
-        aria-label={`Question: ${front}. Tap to reveal answer.`}
-      >
-        <span className="card-tile__index">#{index + 1}</span>
-        <div className="card-tile__detail-body">
-          <div className="card-tile__detail-main">
-            <p className="card-tile__label">Question</p>
-            {frontImage}
-            <p className="card-tile__front">{front}</p>
-          </div>
-          <div className="card-tile__detail-meta">
-            <span className="card-tile__stat-label">Updated</span>
-            <span className="card-tile__stat-value">{updated}</span>
-          </div>
-        </div>
-      </button>
-      {actions}
-    </div>
   );
 }
 
@@ -564,8 +478,6 @@ export function DeckDetail({
     [sorted, page],
   );
 
-  const pageOffset = (page - 1) * CARDS_PER_PAGE;
-
   const containerClass =
     view === "thumbnail"
       ? "card-collection thumbnail"
@@ -604,18 +516,15 @@ export function DeckDetail({
         )}
       </div>
       <div className="content content--library">
-        <header className="page-header">
+        <header className="page-header deck-detail-header">
           <div className="page-header__main">
             <DeckWorkspaceContext info={workspaceInfo} />
             <h1 className="page-title">{deck.name}</h1>
-            {deck.description ? (
-              <p className="page-subtitle">{deck.description}</p>
-            ) : null}
-            <p className="deck-detail__count">
-              {count == null ? "…" : `${count} card${count === 1 ? "" : "s"}`}
-            </p>
           </div>
-          <div className="page-header__actions">
+          <div className="deck-detail-header__bar">
+            <p className="deck-detail__count">
+              {count == null ? "…" : `${count} ${count === 1 ? "card" : "cards"}`}
+            </p>
             <button
               type="button"
               className="btn"
@@ -655,19 +564,14 @@ export function DeckDetail({
                 {CARD_SORT_LABELS[sort].split(" ")[0]}…
               </button>
             </div>
-            {view === "detail" && (
-              <div className="card-column-head" aria-hidden>
-                <span>Question</span>
-                <span>Updated</span>
-              </div>
-            )}
             <div className={containerClass}>
-              {pagedCards.map((card, i) => (
+              {pagedCards.map((card) => (
                 <CardTile
                   key={card.local_id}
+                  deckName={deck.name}
+                  deckDescription={deck.description}
                   card={card}
                   view={view}
-                  index={pageOffset + i}
                   online={online}
                   canEdit={canEdit}
                   onOpenAnswer={setAnswerPreview}

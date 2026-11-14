@@ -141,8 +141,11 @@ export async function acknowledgeDeployVersion(version: string): Promise<void> {
   await writeStoredDeployVersion(version);
 }
 
+const DEPLOY_REFRESH_TOAST_ID = "flipvise-deploy-refresh";
+
 export function showDeployRefreshToast(version: string): void {
   toast.info("Update available", {
+    id: DEPLOY_REFRESH_TOAST_ID,
     description: "A new version of Flipvise is ready. Refresh to load the latest changes.",
     action: {
       label: "Refresh",

@@ -65,10 +65,10 @@ export const VIEW_LABELS: Record<
   OfflineDeckViewMode,
   { title: string; hint: string }
 > = {
-  detail: { title: "Detail", hint: "Full rows with metadata" },
-  grid: { title: "Grid", hint: "Two-column cards" },
-  list: { title: "List", hint: "Compact single-line rows" },
-  thumbnail: { title: "Thumbnail", hint: "Small visual tiles" },
+  detail: { title: "Detail", hint: "Artwork, title, and details" },
+  grid: { title: "Grid", hint: "Illustrated cards" },
+  list: { title: "List", hint: "One deck per row" },
+  thumbnail: { title: "Thumbnail", hint: "Small picture tiles" },
 };
 
 export const SORT_LABELS: Record<OfflineDeckSort, string> = {

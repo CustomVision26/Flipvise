@@ -132,9 +132,22 @@ export function StandardReview({
       }
     >
       <div className="review-stage">
-        <p className="review-stage__instruction">
-          Review each card at your own pace. Tap the card to reveal the answer.
-        </p>
+        <div className="review-stage__instruction">
+          <span className="review-stage__book" aria-hidden>
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v15H7.5A2.5 2.5 0 0 0 5 20.5z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinejoin="round"
+              />
+              <path d="M5 5.5V20.5" fill="none" stroke="currentColor" strokeWidth="1.7" />
+              <path d="M9 8h6M9 11.5h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </span>
+          <p>Review each card at your own pace. Tap the card to reveal the answer.</p>
+        </div>
         <button
           type="button"
           className={`review-card${flipped ? " review-card--flipped" : ""}`}

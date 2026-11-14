@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
+import { AppScene } from "./app-scene";
 import { LockGate } from "./lock-gate";
 import { markBootSplashReady, startBootSplashTimer } from "./boot-splash";
 import "./styles.css";
@@ -36,18 +37,7 @@ try {
 
   createRoot(container).render(
     <LockGate>
-      <div className="app-scene" aria-hidden>
-        <img
-          className="app-scene__light"
-          src={`${import.meta.env.BASE_URL}artwork/woodland-light.png`}
-          alt=""
-        />
-        <img
-          className="app-scene__dark"
-          src={`${import.meta.env.BASE_URL}artwork/woodland-dark.png`}
-          alt=""
-        />
-      </div>
+      <AppScene />
       <App />
     </LockGate>,
   );

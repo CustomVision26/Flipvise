@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-11-13T21:16:59.606Z",
+  "updatedAt": "2026-11-13T23:20:26.819Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "5ce6f266238ea320067c5f1553af7eb853e467babdbd5e8571c0076ffcf33129",
@@ -35,8 +35,8 @@
       "docFingerprint": "f2064dfda6baf3b5cbebf26091f0c79ae8d2d5dae2720c43bfb1fdc0f17567dc"
     },
     "offline-mobile": {
-      "watchFingerprint": "7098c595ac51e533066e059dcf60b8487a582b48ae78c7f4642631eb58da72a6",
-      "docFingerprint": "5d45c394c8d3794f6401bd33d40f26708691a9c73b7f78363da4f91475cb7c8f"
+      "watchFingerprint": "76a9da03ef8a109bcdcdd1e77055db81be24232fbeb6397db073e1d02b034813",
+      "docFingerprint": "804570a62b888c981a3f0cf6b0e10ebb571b1deee8e0ba9e596884004d0eb6f3"
     },
     "inbox": {
       "watchFingerprint": "02ea0a419a2fa1021d3f800875df939fda7167aaee6172685bbf7d97701c266d",

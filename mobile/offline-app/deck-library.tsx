@@ -6,7 +6,6 @@ import type {
 } from "../../src/lib/offline/access-context";
 import { formatOfflineWorkspaceOwnerLabel } from "../../src/lib/offline/access-context";
 import type { OfflineDeckRow } from "../../src/lib/offline/schema";
-import { offlineDeckGradientStyle } from "./deck-gradients";
 import {
   loadDeckSort,
   loadDeckViewMode,
@@ -19,9 +18,8 @@ import {
 } from "./deck-library-prefs";
 import type { SavedWorkspaceScope } from "./workspace-prefs";
 import { WorkspaceSelector } from "./workspace-selector";
-import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
+import { IllustratedOfflineDeck } from "./illustrated-library";
 import { ConfirmDialog } from "./confirm-dialog";
-import { OfflineImage } from "./offline-image";
 import { ImagePickerField } from "./image-picker-field";
 import { Pagination } from "./pagination";
 
@@ -65,14 +63,6 @@ function canEditDeckLocally(deck: OfflineDeckRow): boolean {
   // Deck tiles only render actions in personal scope (see `canEdit` below), so this
   // keeps team-workspace tiles read-only while unlocking workspace-linked personal decks.
   return (deck.member_assigned ?? 0) === 0;
-}
-
-function formatUpdated(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function sortDecks(
@@ -119,136 +109,23 @@ function DeckTile({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const gradient = offlineDeckGradientStyle(deck.gradient);
-  const countLabel = `${deck.cardCount} card${deck.cardCount === 1 ? "" : "s"}`;
-  const updated = formatUpdated(deck.updated_at_ms);
   const showEditDelete = canEdit && canEditDeckLocally(deck);
-  const hasCover = !!deck.cover_image_url;
-  const gradientStyle =
-    !hasCover && (view === "thumbnail" || view === "grid") && gradient
-      ? { background: gradient }
-      : undefined;
-  const coverImage = hasCover ? (
-    <OfflineImage
-      src={deck.cover_image_url}
-      alt=""
-      className="deck-tile__cover"
+  return (
+    <IllustratedOfflineDeck
+      name={deck.name}
+      description={deck.description}
+      coverImageUrl={deck.cover_image_url}
+      cardCount={deck.cardCount}
+      updatedAtMs={deck.updated_at_ms}
       online={online}
-    />
-  ) : null;
-
-  const actions = expanded ? (
-    <LibraryTileActions
+      compact={view === "thumbnail"}
+      menuOpen={expanded}
+      onToggleMenu={onToggleExpand}
       onOpen={onOpen}
       onPreview={onPreview}
       onEdit={showEditDelete ? onEdit : undefined}
       onDelete={showEditDelete ? onDelete : undefined}
     />
-  ) : null;
-
-  const shellClass = `deck-tile-shell deck-tile ${view}${
-    expanded ? " deck-tile-shell--expanded" : ""
-  }`;
-
-  if (view === "list") {
-    return (
-      <div className={shellClass}>
-        <LibraryTileWatermark label="Deck" />
-        {coverImage}
-        <button
-          type="button"
-          className="deck-tile__open"
-          onClick={onToggleExpand}
-          aria-expanded={expanded}
-        >
-          <span className="deck-tile__name">{deck.name}</span>
-          <span className="deck-tile__meta">{countLabel}</span>
-        </button>
-        {actions}
-      </div>
-    );
-  }
-
-  if (view === "thumbnail") {
-    return (
-      <div className={shellClass} style={gradientStyle}>
-        <LibraryTileWatermark label="Deck" />
-        {coverImage}
-        <button
-          type="button"
-          className="deck-tile__open"
-          onClick={onToggleExpand}
-          aria-expanded={expanded}
-        >
-          <span className="deck-tile__thumb-title">{deck.name}</span>
-          <span className="deck-tile__thumb-count">{countLabel}</span>
-        </button>
-        {actions}
-      </div>
-    );
-  }
-
-  if (view === "grid") {
-    return (
-      <div className={shellClass} style={gradientStyle}>
-        <LibraryTileWatermark label="Deck" />
-        {coverImage}
-        <button
-          type="button"
-          className="deck-tile__open"
-          onClick={onToggleExpand}
-          aria-expanded={expanded}
-        >
-          <h3 className="deck-tile__title">{deck.name}</h3>
-          {deck.description && (
-            <p className="deck-tile__desc">{deck.description}</p>
-          )}
-          <div className="deck-tile__footer">
-            <span>{countLabel}</span>
-            <span>{updated}</span>
-          </div>
-        </button>
-        {actions}
-      </div>
-    );
-  }
-
-  return (
-    <div className={shellClass}>
-      <LibraryTileWatermark label="Deck" />
-      {coverImage}
-      <button
-        type="button"
-        className="deck-tile__open"
-        onClick={onToggleExpand}
-        aria-expanded={expanded}
-      >
-        <div
-          className="deck-tile__accent"
-          style={gradient ? { background: gradient } : undefined}
-          aria-hidden
-        />
-        <div className="deck-tile__body">
-          <div className="deck-tile__detail-main">
-            <h3 className="deck-tile__title">{deck.name}</h3>
-            {deck.description && (
-              <p className="deck-tile__desc">{deck.description}</p>
-            )}
-          </div>
-          <div className="deck-tile__detail-meta">
-            <span className="deck-tile__stat">
-              <span className="deck-tile__stat-label">Cards</span>
-              <span className="deck-tile__stat-value">{deck.cardCount}</span>
-            </span>
-            <span className="deck-tile__stat">
-              <span className="deck-tile__stat-label">Updated</span>
-              <span className="deck-tile__stat-value">{updated}</span>
-            </span>
-          </div>
-        </div>
-      </button>
-      {actions}
-    </div>
   );
 }
 
@@ -352,22 +229,32 @@ function ViewSortSheet({
 }) {
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet sheet--menu" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="sheet sheet--menu"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="deck-display-title"
+      >
         <div className="sheet-head">
-          <h2>Display &amp; sort</h2>
+          <h2 id="deck-display-title">Display and sort</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            ×
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
           </button>
         </div>
 
-        <p className="sheet-section-label">View as</p>
-        <div className="option-list">
+        <p className="sheet-section-label" id="deck-view-label">View</p>
+        <div className="option-list" role="radiogroup" aria-labelledby="deck-view-label">
           {(Object.keys(VIEW_LABELS) as OfflineDeckViewMode[]).map((mode) => {
             const active = mode === view;
             return (
               <button
                 key={mode}
                 type="button"
+                role="radio"
+                aria-checked={active}
                 className={`option-row${active ? " active" : ""}`}
                 onClick={() => onView(mode)}
               >
@@ -375,27 +262,29 @@ function ViewSortSheet({
                   <strong>{VIEW_LABELS[mode].title}</strong>
                   <small>{VIEW_LABELS[mode].hint}</small>
                 </span>
-                {active && <span className="check">✓</span>}
+                <span className="option-mark" aria-hidden />
               </button>
             );
           })}
         </div>
 
-        <p className="sheet-section-label">Sort by</p>
-        <div className="option-list">
+        <p className="sheet-section-label" id="deck-sort-label">Sort</p>
+        <div className="option-list" role="radiogroup" aria-labelledby="deck-sort-label">
           {(Object.keys(SORT_LABELS) as OfflineDeckSort[]).map((key) => {
             const active = key === sort;
             return (
               <button
                 key={key}
                 type="button"
+                role="radio"
+                aria-checked={active}
                 className={`option-row${active ? " active" : ""}`}
                 onClick={() => onSort(key)}
               >
                 <span>
                   <strong>{SORT_LABELS[key]}</strong>
                 </span>
-                {active && <span className="check">✓</span>}
+                <span className="option-mark" aria-hidden />
               </button>
             );
           })}
@@ -645,13 +534,6 @@ export function DeckLibrary({
         </div>
       ) : (
         <>
-          {view === "detail" && sorted.length > 0 && (
-            <div className="deck-column-head" aria-hidden>
-              <span>Name / Description</span>
-              <span>Cards</span>
-              <span>Updated</span>
-            </div>
-          )}
           <div className={containerClass}>
             {pagedDecks.map((deck) => (
               <DeckTile
@@ -674,8 +556,14 @@ export function DeckLibrary({
                   setExpandedDeckId(null);
                   onPreviewDeck(deck);
                 }}
-                onEdit={() => setEditingDeck(deck)}
-                onDelete={() => setDeletingDeck(deck)}
+                onEdit={() => {
+                  setExpandedDeckId(null);
+                  setEditingDeck(deck);
+                }}
+                onDelete={() => {
+                  setExpandedDeckId(null);
+                  setDeletingDeck(deck);
+                }}
               />
             ))}
           </div>
