@@ -66,7 +66,12 @@ export function EducationWorkspaceDecks({
     if (!selected) {
       return { teamAdmin: [], ownerLessonPlans: [], otherOwner: [] };
     }
-    const rows = decks.filter((deck) => deck.team_id === selected.teamId);
+    const linkedIds = new Set(selected.workspaceDeckServerIds ?? []);
+    const rows = decks.filter(
+      (deck) =>
+        deck.team_id === selected.teamId ||
+        (deck.server_id != null && linkedIds.has(deck.server_id)),
+    );
     const ownerUserId =
       rows.find((deck) => deck.owner_user_id?.trim())?.owner_user_id?.trim() ||
       rows[0]?.user_id ||

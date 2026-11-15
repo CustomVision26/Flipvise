@@ -10,6 +10,7 @@ import {
   getEligibleWorkspaceTeamsForUser,
   getTeamById,
   getTeamMembershipsForUser,
+  getTeamsByOwner,
   getWorkspaceNavTeamsForUser,
 } from "@/db/queries/teams";
 import {
@@ -23,6 +24,7 @@ import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
 import {
   hasEducationPlan,
+  isEducationTeamPlanId,
   isWorkspaceSubscriptionPlanSlug,
   labelForEducationPlanSlug,
 } from "@/lib/education-plans";
@@ -550,6 +552,36 @@ export async function buildOfflineSyncContext(
   const workspaceContexts: OfflineSyncWorkspaceContext[] = workspaceContextRows.filter(
     (row) => row != null,
   );
+
+  // Owned education workspaces are omitted from the team switcher on purpose.
+  // The personal dashboard still lists them under Workspaces.
+  const knownTeamIds = new Set(workspaceContexts.map((workspace) => workspace.teamId));
+  const ownedEducationTeams = (await getTeamsByOwner(userId)).filter((team) =>
+    isEducationTeamPlanId(team.planSlug),
+  );
+  for (const team of ownedEducationTeams) {
+    if (knownTeamIds.has(team.id)) continue;
+    const limits = limitsForPlan(team.planSlug);
+    const workspaceDeckServerIds = (await getDecksForTeam(team.id, userId)).map(
+      (deck) => deck.id,
+    );
+    workspaceContexts.push({
+      teamId: team.id,
+      name: team.name,
+      planSlug: team.planSlug,
+      planLabel: labelForEducationPlanSlug(team.planSlug) ?? team.planSlug,
+      role: "owner",
+      teamMemberId: 0,
+      canAccessTeamAdmin: true,
+      maxDecksPerWorkspace: limits.maxDecksPerWorkspace,
+      maxCardsPerDeck: CARDS_PER_DECK_LIMIT_PRO_PLUS,
+      canCreateDeck: true,
+      ownerDisplayName: viewerField.primaryLine,
+      ownerEmail: viewerField.primaryEmail,
+      isSubscriberOwned: true,
+      workspaceDeckServerIds,
+    });
+  }
 
   const personalHasTeamTierPlan = personalLabels.personalHasTeamTierPlan;
   const workspacesForOffline = personalHasTeamTierPlan
