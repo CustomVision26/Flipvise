@@ -11,6 +11,28 @@ import {
 } from "./deck-library-prefs";
 import type { DeckWithCount } from "./deck-library";
 
+/** Same workspace id the online Personal Dash uses (`decks.teamId`). */
+export function personalDashboardTeamId(deck: {
+  team_id?: number | null;
+  library_team_id?: number | null;
+  library_team_known?: number | null;
+  description?: string | null;
+}): number | null {
+  if (Number(deck.library_team_known) === 1) {
+    return deck.library_team_id ?? null;
+  }
+  const description = deck.description ?? "";
+  // A linked quiz can be stored with a workspace id even though Personal Dash
+  // keeps it with the other personal decks. The lesson-plan deck stays put.
+  if (
+    /teacher quiz deck/i.test(description) &&
+    !/teacher lesson plan deck/i.test(description)
+  ) {
+    return null;
+  }
+  return deck.team_id ?? null;
+}
+
 export function ownedEducationWorkspaces(
   workspaces: OfflineWorkspaceContext[],
 ): OfflineWorkspaceContext[] {
@@ -66,7 +88,9 @@ export function EducationWorkspaceDecks({
     if (!selected) {
       return { teamAdmin: [], ownerLessonPlans: [], otherOwner: [] };
     }
-    const rows = decks.filter((deck) => deck.team_id === selected.teamId);
+    const rows = decks.filter(
+      (deck) => personalDashboardTeamId(deck) === selected.teamId,
+    );
     const ownerUserId =
       rows.find((deck) => deck.owner_user_id?.trim())?.owner_user_id?.trim() ||
       rows[0]?.user_id ||

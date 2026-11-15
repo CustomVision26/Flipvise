@@ -107,6 +107,8 @@ export const OFFLINE_SCHEMA_MIGRATIONS: string[] = [
   `ALTER TABLE decks ADD COLUMN member_assigned INTEGER NOT NULL DEFAULT 0;`,
   `ALTER TABLE decks ADD COLUMN owner_user_id TEXT;`,
   `ALTER TABLE decks ADD COLUMN created_by_user_id TEXT;`,
+  `ALTER TABLE decks ADD COLUMN library_team_id INTEGER;`,
+  `ALTER TABLE decks ADD COLUMN library_team_known INTEGER NOT NULL DEFAULT 0;`,
   `CREATE INDEX IF NOT EXISTS decks_team_idx ON decks(team_id);`,
   `CREATE INDEX IF NOT EXISTS decks_owner_user_idx ON decks(owner_user_id);`,
   `CREATE TABLE IF NOT EXISTS offline_images (
@@ -130,6 +132,10 @@ export interface OfflineDeckRow {
   owner_user_id?: string | null;
   /** Postgres `decks.createdByUserId` — team admin vs plan owner on education workspaces. */
   created_by_user_id?: string | null;
+  /** Postgres `decks.teamId`. Null means the deck stays on Personal Dash. */
+  library_team_id?: number | null;
+  /** 1 after a sync that sent `libraryTeamId`, including when that value is null. */
+  library_team_known?: number | null;
   name: string;
   description: string | null;
   gradient: string | null;

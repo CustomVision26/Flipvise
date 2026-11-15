@@ -315,6 +315,9 @@ export interface PullDeck {
   gradient: string | null;
   coverImageUrl: string | null;
   updatedAtMs: number;
+  createdByUserId?: string | null;
+  /** Postgres `decks.teamId`. Null keeps the deck on Personal Dash. */
+  libraryTeamId?: number | null;
 }
 
 export interface PullCard {
@@ -424,7 +427,7 @@ async function collectAccessibleDeckMeta(
         continue;
       }
       map.set(d.id, {
-        teamId: team.id,
+        teamId: d.teamId ?? existing?.teamId ?? null,
         memberAssigned: existing?.memberAssigned ?? false,
       });
     }
@@ -686,6 +689,7 @@ export async function pullOfflineChanges(
         // Personal dashboard groups only decks whose own workspace id is set.
         // Linked or assigned personal decks stay personal unless a member was given them.
         teamId: d.teamId ?? (meta.memberAssigned ? meta.teamId : null),
+        libraryTeamId: d.teamId ?? null,
         memberAssigned: meta.memberAssigned,
         name: d.name,
         description: d.description,

@@ -25,6 +25,7 @@ import { DisplayMenu } from "./display-menu";
 import {
   EducationWorkspaceDecks,
   ownedEducationWorkspaces,
+  personalDashboardTeamId,
 } from "./education-workspace-decks";
 import { Pagination } from "./pagination";
 
@@ -318,8 +319,10 @@ export function DeckLibrary({
     () => new Set(educationWorkspaces.map((workspace) => workspace.teamId)),
     [educationWorkspaces],
   );
-  const isEducationWorkspaceDeck = (deck: DeckWithCount) =>
-    deck.team_id != null && educationTeamIds.has(deck.team_id);
+  const isEducationWorkspaceDeck = (deck: DeckWithCount) => {
+    const teamId = personalDashboardTeamId(deck);
+    return teamId != null && educationTeamIds.has(teamId);
+  };
   const personalDecks = useMemo(
     () =>
       educationWorkspaces.length === 0
