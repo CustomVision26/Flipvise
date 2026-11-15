@@ -106,6 +106,7 @@ export const OFFLINE_SCHEMA_MIGRATIONS: string[] = [
   `ALTER TABLE decks ADD COLUMN team_id INTEGER;`,
   `ALTER TABLE decks ADD COLUMN member_assigned INTEGER NOT NULL DEFAULT 0;`,
   `ALTER TABLE decks ADD COLUMN owner_user_id TEXT;`,
+  `ALTER TABLE decks ADD COLUMN created_by_user_id TEXT;`,
   `CREATE INDEX IF NOT EXISTS decks_team_idx ON decks(team_id);`,
   `CREATE INDEX IF NOT EXISTS decks_owner_user_idx ON decks(owner_user_id);`,
   `CREATE TABLE IF NOT EXISTS offline_images (
@@ -127,6 +128,8 @@ export interface OfflineDeckRow {
   user_id: string;
   /** Postgres `decks.userId` — author on the server (differs for invited-workspace study copies). */
   owner_user_id?: string | null;
+  /** Postgres `decks.createdByUserId` — team admin vs plan owner on education workspaces. */
+  created_by_user_id?: string | null;
   name: string;
   description: string | null;
   gradient: string | null;

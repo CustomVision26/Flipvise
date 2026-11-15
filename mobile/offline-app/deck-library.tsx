@@ -22,6 +22,10 @@ import { IllustratedOfflineDeck } from "./illustrated-library";
 import { ConfirmDialog } from "./confirm-dialog";
 import { ImagePickerField } from "./image-picker-field";
 import { DisplayMenu } from "./display-menu";
+import {
+  EducationWorkspaceDecks,
+  ownedEducationWorkspaces,
+} from "./education-workspace-decks";
 import { Pagination } from "./pagination";
 
 const DECKS_PER_PAGE = 12;
@@ -305,9 +309,37 @@ export function DeckLibrary({
     [decks, counts],
   );
 
+  const educationWorkspaces = useMemo(
+    () =>
+      workspaceScope === "personal" ? ownedEducationWorkspaces(workspaces) : [],
+    [workspaceScope, workspaces],
+  );
+  const educationTeamIds = useMemo(
+    () => new Set(educationWorkspaces.map((workspace) => workspace.teamId)),
+    [educationWorkspaces],
+  );
+  const personalDecks = useMemo(
+    () =>
+      educationTeamIds.size === 0
+        ? decksWithCounts
+        : decksWithCounts.filter(
+            (deck) => deck.team_id == null || !educationTeamIds.has(deck.team_id),
+          ),
+    [decksWithCounts, educationTeamIds],
+  );
+  const educationDecks = useMemo(
+    () =>
+      educationTeamIds.size === 0
+        ? []
+        : decksWithCounts.filter(
+            (deck) => deck.team_id != null && educationTeamIds.has(deck.team_id),
+          ),
+    [decksWithCounts, educationTeamIds],
+  );
+
   const sorted = useMemo(
-    () => sortDecks(decksWithCounts, sort),
-    [decksWithCounts, sort],
+    () => sortDecks(personalDecks, sort),
+    [personalDecks, sort],
   );
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / DECKS_PER_PAGE));
@@ -342,6 +374,38 @@ export function DeckLibrary({
   }
 
   const canEditDecks = canCreateDeck;
+
+  function renderLibraryDeck(deck: DeckWithCount, deckView: OfflineDeckViewMode) {
+    return (
+      <DeckTile
+        key={deck.local_id}
+        deck={deck}
+        view={deckView}
+        online={online}
+        canEdit={canEditDecks}
+        expanded={expandedDeckId === deck.local_id}
+        onToggleExpand={() =>
+          setExpandedDeckId((id) => (id === deck.local_id ? null : deck.local_id))
+        }
+        onOpen={() => {
+          setExpandedDeckId(null);
+          onOpenDeck(deck);
+        }}
+        onPreview={() => {
+          setExpandedDeckId(null);
+          onPreviewDeck(deck);
+        }}
+        onEdit={() => {
+          setExpandedDeckId(null);
+          setEditingDeck(deck);
+        }}
+        onDelete={() => {
+          setExpandedDeckId(null);
+          setDeletingDeck(deck);
+        }}
+      />
+    );
+  }
 
   const containerClass =
     view === "thumbnail"
@@ -461,52 +525,37 @@ export function DeckLibrary({
         <div className="library-loading" aria-busy="true" aria-live="polite">
           <p>Loading decks…</p>
         </div>
-      ) : sorted.length === 0 ? (
-        <div className="empty">
-          <h2>{emptyTitle}</h2>
-          <p>{emptyBody}</p>
-        </div>
       ) : (
         <>
-          <div className={containerClass}>
-            {pagedDecks.map((deck) => (
-              <DeckTile
-                key={deck.local_id}
-                deck={deck}
-                view={view}
-                online={online}
-                canEdit={canEditDecks}
-                expanded={expandedDeckId === deck.local_id}
-                onToggleExpand={() =>
-                  setExpandedDeckId((id) =>
-                    id === deck.local_id ? null : deck.local_id,
-                  )
-                }
-                onOpen={() => {
-                  setExpandedDeckId(null);
-                  onOpenDeck(deck);
-                }}
-                onPreview={() => {
-                  setExpandedDeckId(null);
-                  onPreviewDeck(deck);
-                }}
-                onEdit={() => {
-                  setExpandedDeckId(null);
-                  setEditingDeck(deck);
-                }}
-                onDelete={() => {
-                  setExpandedDeckId(null);
-                  setDeletingDeck(deck);
-                }}
+          {sorted.length === 0 && educationWorkspaces.length === 0 ? (
+            <div className="empty">
+              <h2>{emptyTitle}</h2>
+              <p>{emptyBody}</p>
+            </div>
+          ) : sorted.length > 0 ? (
+            <>
+              {educationWorkspaces.length > 0 ? (
+                <h2 className="library-section-label">Personal</h2>
+              ) : null}
+              <div className={containerClass}>
+                {pagedDecks.map((deck) => renderLibraryDeck(deck, view))}
+              </div>
+              <Pagination
+                page={page}
+                pageCount={pageCount}
+                onPageChange={setPage}
+                label="Deck pages"
               />
-            ))}
-          </div>
-          <Pagination
-            page={page}
-            pageCount={pageCount}
-            onPageChange={setPage}
-            label="Deck pages"
-          />
+            </>
+          ) : null}
+
+          {educationWorkspaces.length > 0 ? (
+            <EducationWorkspaceDecks
+              workspaces={educationWorkspaces}
+              decks={educationDecks}
+              renderDeck={renderLibraryDeck}
+            />
+          ) : null}
         </>
       )}
 

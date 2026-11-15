@@ -659,6 +659,7 @@ export async function pullOfflineChanges(
         gradient: d.gradient,
         coverImageUrl: d.coverImageUrl,
         updatedAtMs: (d.updatedAt ?? d.createdAt ?? new Date()).getTime(),
+        createdByUserId: d.createdByUserId ?? null,
       };
     }),
     cards: cardRows.map((c) => ({

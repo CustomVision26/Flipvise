@@ -58,6 +58,7 @@ interface SyncResponse {
       gradient: string | null;
       coverImageUrl: string | null;
       updatedAtMs: number;
+      createdByUserId?: string | null;
     }[];
     cards: {
       serverId: number;
@@ -461,10 +462,11 @@ async function applyServerResponse(
   for (const d of data.pull.decks) {
     await db.run(
       `INSERT INTO decks (local_id, server_id, user_id, owner_user_id, name, description, gradient,
-         cover_image_url, created_at_ms, updated_at_ms, dirty, deleted, team_id, member_assigned)
+         cover_image_url, created_at_ms, updated_at_ms, dirty, deleted, team_id, member_assigned,
+         created_by_user_id)
        VALUES (
          COALESCE((SELECT local_id FROM decks WHERE server_id = ?), lower(hex(randomblob(16)))),
-         ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)
        ON CONFLICT(local_id) DO UPDATE SET
          server_id = excluded.server_id,
          user_id = excluded.user_id,
@@ -475,7 +477,8 @@ async function applyServerResponse(
          cover_image_url = excluded.cover_image_url,
          updated_at_ms = excluded.updated_at_ms,
          team_id = excluded.team_id,
-         member_assigned = excluded.member_assigned
+         member_assigned = excluded.member_assigned,
+         created_by_user_id = excluded.created_by_user_id
        WHERE decks.dirty = 0 AND decks.updated_at_ms <= excluded.updated_at_ms;`,
       [
         d.serverId,
@@ -490,6 +493,7 @@ async function applyServerResponse(
         d.updatedAtMs,
         d.teamId,
         d.memberAssigned ? 1 : 0,
+        d.createdByUserId ?? null,
       ],
     );
   }
