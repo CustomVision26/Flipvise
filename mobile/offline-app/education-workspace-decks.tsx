@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
 import { isEducationTeamPlanId } from "../../src/lib/education-plans";
 import { partitionEducationOwnerWorkspaceDecks } from "../../src/lib/education-owner-workspace-decks";
@@ -56,7 +56,7 @@ export function EducationWorkspaceDecks({
   const [workspaceId, setWorkspaceId] = useState(
     () => workspaces.find((workspace) => workspace.teamId)?.teamId ?? workspaces[0]?.teamId,
   );
-  const [view, setView] = useState<OfflineDeckViewMode>("grid");
+  const [view, setView] = useState<OfflineDeckViewMode>("detail");
   const [sort, setSort] = useState<OfflineDeckSort>("updated-desc");
 
   const selected =
@@ -66,22 +66,24 @@ export function EducationWorkspaceDecks({
     if (!selected) {
       return { teamAdmin: [], ownerLessonPlans: [], otherOwner: [] };
     }
-    const linkedIds = new Set(selected.workspaceDeckServerIds ?? []);
-    const rows = decks.filter(
-      (deck) =>
-        deck.team_id === selected.teamId ||
-        (deck.server_id != null && linkedIds.has(deck.server_id)),
-    );
+    const rows = decks.filter((deck) => deck.team_id === selected.teamId);
     const ownerUserId =
       rows.find((deck) => deck.owner_user_id?.trim())?.owner_user_id?.trim() ||
       rows[0]?.user_id ||
       "";
+    const ownerIds = new Set(
+      rows.flatMap((deck) => [deck.owner_user_id?.trim(), deck.user_id?.trim()]).filter(Boolean),
+    );
     const parts = partitionEducationOwnerWorkspaceDecks(
-      rows.map((deck) => ({
-        ...deck,
-        createdByUserId: deck.created_by_user_id,
-        description: deck.description,
-      })),
+      rows.map((deck) => {
+        const creator = deck.created_by_user_id?.trim() ?? "";
+        const createdByOwner = creator.length > 0 && ownerIds.has(creator);
+        return {
+          ...deck,
+          createdByUserId: createdByOwner ? ownerUserId : deck.created_by_user_id,
+          description: deck.description,
+        };
+      }),
       ownerUserId,
     );
     return {
@@ -122,20 +124,11 @@ export function EducationWorkspaceDecks({
         </p>
       </div>
       <div className="edu-workspaces__controls">
-        <label className="edu-workspaces__field">
-          <span>Workspace</span>
-          <select
-            className="edu-workspaces__select"
-            value={String(selected.teamId)}
-            onChange={(event) => setWorkspaceId(Number(event.target.value))}
-          >
-            {workspaces.map((workspace) => (
-              <option key={workspace.teamId} value={workspace.teamId}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <WorkspacePicker
+          workspaces={workspaces}
+          selectedId={selected.teamId}
+          onSelect={setWorkspaceId}
+        />
         <DisplayMenu
           view={view}
           sort={sort}
@@ -192,6 +185,86 @@ export function EducationWorkspaceDecks({
         </Group>
       ) : null}
     </section>
+  );
+}
+
+function WorkspacePicker({
+  workspaces,
+  selectedId,
+  onSelect,
+}: {
+  workspaces: OfflineWorkspaceContext[];
+  selectedId: number;
+  onSelect: (teamId: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = workspaces.find((workspace) => workspace.teamId === selectedId) ?? workspaces[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  if (!selected) return null;
+
+  return (
+    <div className="edu-workspaces__field" ref={rootRef}>
+      <span>Workspace</span>
+      <button
+        type="button"
+        className="edu-workspaces__select"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>{selected.name}</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+          <path
+            d="M6 9l6 6 6-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {open ? (
+        <div className="edu-workspaces__menu" role="listbox" aria-label="Workspace">
+          {workspaces.map((workspace) => {
+            const active = workspace.teamId === selected.teamId;
+            return (
+              <button
+                key={workspace.teamId}
+                type="button"
+                role="option"
+                aria-selected={active}
+                className={`edu-workspaces__option${active ? " is-active" : ""}`}
+                onClick={() => {
+                  onSelect(workspace.teamId);
+                  setOpen(false);
+                }}
+              >
+                <span>{workspace.name}</span>
+                <span className="edu-workspaces__option-mark" aria-hidden />
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

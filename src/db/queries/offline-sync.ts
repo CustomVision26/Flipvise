@@ -683,8 +683,9 @@ export async function pullOfflineChanges(
       return {
         serverId: d.id,
         ownerUserId: d.userId,
-        // Prefer the decks-table FK; fall back to workspace context for link-table decks.
-        teamId: d.teamId ?? meta.teamId,
+        // Personal dashboard groups only decks whose own workspace id is set.
+        // Linked or assigned personal decks stay personal unless a member was given them.
+        teamId: d.teamId ?? (meta.memberAssigned ? meta.teamId : null),
         memberAssigned: meta.memberAssigned,
         name: d.name,
         description: d.description,

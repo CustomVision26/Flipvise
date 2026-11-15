@@ -11,14 +11,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import { ChevronDown } from "lucide-react";
 import {
   ViewModeDropdown,
   type ViewMode,
@@ -265,28 +266,47 @@ export function EducationOwnerWorkspaceDecks({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="grid gap-1.5">
             <Label htmlFor="education-owner-workspace">Workspace</Label>
-            <Select
-              value={String(selected.id)}
-              onValueChange={(value) => {
-                if (value) setWorkspaceId(value);
-              }}
-            >
-              <SelectTrigger
-                id="education-owner-workspace"
-                className="w-full sm:w-56"
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={(props) => (
+                  <Button
+                    {...props}
+                    id="education-owner-workspace"
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-full justify-between bg-background px-3 text-sm font-normal text-foreground sm:w-56"
+                  >
+                    <span className="truncate">{selected.name}</span>
+                    <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                  </Button>
+                )}
+              />
+              <DropdownMenuContent
+                align="start"
+                className="w-(--anchor-width) min-w-56 bg-popover p-1.5 text-popover-foreground"
               >
-                <SelectValue placeholder="Select a workspace">
-                  {selected.name}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {workspaces.map((workspace) => (
-                  <SelectItem key={workspace.id} value={String(workspace.id)}>
-                    {workspace.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                {workspaces.map((workspace) => {
+                  const active = workspace.id === selected.id;
+                  return (
+                    <DropdownMenuItem
+                      key={workspace.id}
+                      onClick={() => setWorkspaceId(String(workspace.id))}
+                      className="cursor-pointer justify-between gap-3 py-2.5 text-sm text-foreground"
+                    >
+                      <span className="truncate">{workspace.name}</span>
+                      <span
+                        className={`size-4 shrink-0 rounded-full border ${
+                          active
+                            ? "border-primary bg-primary shadow-[inset_0_0_0_3px_var(--popover)]"
+                            : "border-muted-foreground/50 bg-transparent"
+                        }`}
+                        aria-hidden
+                      />
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <ViewModeDropdown
             view={view}

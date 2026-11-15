@@ -318,29 +318,21 @@ export function DeckLibrary({
     () => new Set(educationWorkspaces.map((workspace) => workspace.teamId)),
     [educationWorkspaces],
   );
-  const educationDeckServerIds = useMemo(
-    () =>
-      new Set(
-        educationWorkspaces.flatMap((workspace) => workspace.workspaceDeckServerIds ?? []),
-      ),
-    [educationWorkspaces],
-  );
   const isEducationWorkspaceDeck = (deck: DeckWithCount) =>
-    (deck.team_id != null && educationTeamIds.has(deck.team_id)) ||
-    (deck.server_id != null && educationDeckServerIds.has(deck.server_id));
+    deck.team_id != null && educationTeamIds.has(deck.team_id);
   const personalDecks = useMemo(
     () =>
       educationWorkspaces.length === 0
         ? decksWithCounts
         : decksWithCounts.filter((deck) => !isEducationWorkspaceDeck(deck)),
-    [decksWithCounts, educationWorkspaces.length, educationTeamIds, educationDeckServerIds],
+    [decksWithCounts, educationWorkspaces.length, educationTeamIds],
   );
   const educationDecks = useMemo(
     () =>
       educationWorkspaces.length === 0
         ? []
         : decksWithCounts.filter((deck) => isEducationWorkspaceDeck(deck)),
-    [decksWithCounts, educationWorkspaces.length, educationTeamIds, educationDeckServerIds],
+    [decksWithCounts, educationWorkspaces.length, educationTeamIds],
   );
 
   const sorted = useMemo(
