@@ -364,12 +364,23 @@ export function DeckQuiz({
     const nextAnswers = [...answers];
     nextAnswers[index] = selected;
     setAnswers(nextAnswers);
-    setSelected(null);
     if (isLast) {
       void finishQuiz(nextAnswers, questions);
-    } else {
-      setIndex((n) => n + 1);
+      return;
     }
+    const next = index + 1;
+    setIndex(next);
+    setSelected(nextAnswers[next] ?? null);
+  };
+
+  const goBack = () => {
+    if (index === 0) return;
+    const nextAnswers = [...answers];
+    if (selected != null) nextAnswers[index] = selected;
+    const prev = index - 1;
+    setAnswers(nextAnswers);
+    setIndex(prev);
+    setSelected(nextAnswers[prev] ?? null);
   };
 
   return (
@@ -384,6 +395,14 @@ export function DeckQuiz({
       progressTotal={questions.length}
       footer={
         <StudySessionControls>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={goBack}
+            disabled={index === 0}
+          >
+            Previous
+          </button>
           <button
             type="button"
             className="btn"

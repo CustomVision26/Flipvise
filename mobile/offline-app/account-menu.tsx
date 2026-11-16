@@ -19,13 +19,20 @@ export function AccountMenu({
   email,
   planLabel,
   planAccessType,
+  signedIn = false,
+  onOpenInBrowser,
 }: {
   displayName?: string;
   email?: string | null;
   planLabel?: string;
   planAccessType?: string;
+  /** True when this device already has an offline study sign-in. */
+  signedIn?: boolean;
+  /** Opens the live site in the phone browser. */
+  onOpenInBrowser?: () => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const [openingBrowser, setOpeningBrowser] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,6 +57,17 @@ export function AccountMenu({
 
   const name = displayName?.trim() || "Your account";
   const initials = initialsFrom(displayName, email);
+
+  const openInBrowser = async () => {
+    if (!onOpenInBrowser || openingBrowser) return;
+    setOpeningBrowser(true);
+    try {
+      await onOpenInBrowser();
+      setOpen(false);
+    } finally {
+      setOpeningBrowser(false);
+    }
+  };
 
   return (
     <div className="account-menu" ref={rootRef}>
@@ -105,6 +123,22 @@ export function AccountMenu({
                 {planAccessType ?? "Free"}
               </span>
             </div>
+            {onOpenInBrowser ? (
+              <button
+                type="button"
+                className="btn account-menu__browser"
+                onClick={() => {
+                  void openInBrowser();
+                }}
+                disabled={openingBrowser}
+              >
+                {openingBrowser
+                  ? "Opening…"
+                  : signedIn
+                    ? "Open account in browser"
+                    : "Open Flipvise"}
+              </button>
+            ) : null}
           </div>
         </div>
       )}

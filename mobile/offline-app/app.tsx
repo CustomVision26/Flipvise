@@ -672,13 +672,60 @@ export function App() {
     window.setTimeout(() => setOpeningLive(false), 20_000);
   }, [openLivePath, openingLive]);
 
+  const openAccountInBrowser = useCallback(async () => {
+    const base = bundledLiveUrl();
+    const home = `${base}/`;
+    const open = async (url: string) => {
+      try {
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url });
+      } catch {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    };
+
+    if (!userId || !navigator.onLine) {
+      await open(home);
+      return;
+    }
+
+    try {
+      const syncToken = await getStoredSyncToken().catch(() => null);
+      if (syncToken) {
+        const res = await fetch(`${base}/api/native/clerk-handoff`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${syncToken}` },
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { ticket?: string };
+          if (data.ticket) {
+            const target = `${base}/native-signin?ticket=${encodeURIComponent(data.ticket)}&redirect=${encodeURIComponent("/dashboard")}`;
+            await open(target);
+            return;
+          }
+        }
+      }
+    } catch {
+      // The browser still opens. A missing ticket lands on the home page.
+    }
+    await open(home);
+  }, [userId]);
+
   const libraryLoading = dbReady === null || !libraryReady || scopeLoading;
 
   if (dbReady === false) {
     const dbHint = getLastOfflineDbError();
     return (
       <div className="app">
-        <Topbar online={online} onOpen={openLiveApp} onSync={handleSync} syncing={syncing} openingLive={openingLive} />
+        <Topbar
+          online={online}
+          onOpen={openLiveApp}
+          onSync={handleSync}
+          syncing={syncing}
+          openingLive={openingLive}
+          signedIn={Boolean(userId)}
+          onOpenAccount={openAccountInBrowser}
+        />
         <div className="content">
           <div className="empty">
             <h2>Offline storage unavailable</h2>
@@ -788,6 +835,8 @@ export function App() {
         viewerEmail={accessContext.viewerEmail}
         accountPlanLabel={accountPlanDisplay.plan}
         accountPlanAccessType={accountPlanDisplay.planType}
+        signedIn={Boolean(userId)}
+        onOpenAccount={openAccountInBrowser}
       />
       <div className="content content--library">
         <DeckLibrary
@@ -855,6 +904,8 @@ function Topbar({
   viewerEmail,
   accountPlanLabel,
   accountPlanAccessType,
+  signedIn = false,
+  onOpenAccount,
 }: {
   online: boolean;
   onOpen: () => void;
@@ -866,6 +917,8 @@ function Topbar({
   viewerEmail?: string | null;
   accountPlanLabel?: string;
   accountPlanAccessType?: string;
+  signedIn?: boolean;
+  onOpenAccount?: () => void | Promise<void>;
 }) {
   return (
     <header className="topbar topbar--shell">
@@ -910,6 +963,8 @@ function Topbar({
           email={viewerEmail}
           planLabel={accountPlanLabel}
           planAccessType={accountPlanAccessType}
+          signedIn={signedIn}
+          onOpenInBrowser={onOpenAccount}
         />
       </div>
     </header>

@@ -3872,6 +3872,9 @@ body:has(.home-page) footer :is(p, address, a, span) {
 }
 
 .signup-dialog {
+  box-sizing: border-box;
+  width: min(34rem, calc(100vw - 2.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))) !important;
+  max-width: min(34rem, calc(100vw - 2.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))) !important;
   border-radius: 1.6rem !important;
   border: 1px solid #c4b5fd !important;
   background-color: rgb(255 250 243 / 0.96) !important;
@@ -3880,7 +3883,8 @@ body:has(.home-page) footer :is(p, address, a, span) {
   box-shadow:
     0 0 0 1px rgb(196 181 253 / 0.55),
     0 22px 50px rgb(76 29 149 / 0.22);
-  padding: 1.35rem 1.25rem 1.1rem;
+  padding: 1.5rem 1.4rem 1.15rem !important;
+  overflow-x: hidden;
 }
 
 .dark .signup-dialog {
@@ -3893,9 +3897,16 @@ body:has(.home-page) footer :is(p, address, a, span) {
     0 24px 60px rgb(0 0 0 / 0.5);
 }
 
+.signup-dialog [data-slot="dialog-header"],
+.signup-dialog form {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .signup-dialog [data-slot="dialog-title"] {
-  font-size: 1.65rem;
+  font-size: 1.5rem;
   font-weight: 800;
+  line-height: 1.2;
   letter-spacing: -0.02em;
   color: #1e1b4b !important;
   -webkit-text-fill-color: #1e1b4b !important;
@@ -3920,15 +3931,22 @@ body:has(.home-page) footer :is(p, address, a, span) {
 
 .signup-dialog-intro {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 6.75rem;
+  grid-template-columns: minmax(0, 1fr) 5.25rem;
   align-items: start;
-  gap: 0.35rem;
-  padding-right: 1.6rem;
+  gap: 0.75rem;
+  padding-top: 0.15rem;
+}
+
+@media (max-width: 520px) {
+  .signup-dialog form > .grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .signup-dialog-owl {
-  width: 6.75rem;
+  width: 5.25rem;
   height: auto;
+  margin-top: 1.6rem;
   justify-self: end;
   object-fit: contain;
   pointer-events: none;
@@ -3987,8 +4005,9 @@ body:has(.home-page) footer :is(p, address, a, span) {
 }
 
 .signup-dialog [data-slot="dialog-close"] {
-  top: 0.7rem;
-  right: 0.7rem;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 8;
   border-radius: 999px !important;
   background-color: #7c3aed !important;
   background-image: none !important;
@@ -6274,8 +6293,10 @@ html.dark .quiz-result-card :is(h2, p, span) {
   -webkit-text-fill-color: #f8fafc;
 }
 
-.quiz-result-card .quiz-result-stat,
-.quiz-result-card .quiz-result-stat :is(span, svg) {
+.quiz-result-card .quiz-result-stat-correct,
+.quiz-result-card .quiz-result-stat-correct :is(span, svg),
+.quiz-result-card .quiz-result-stat-incorrect,
+.quiz-result-card .quiz-result-stat-incorrect :is(span, svg) {
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
 }
@@ -6290,12 +6311,12 @@ html.dark .quiz-result-card :is(h2, p, span) {
   border-color: #fb7185 !important;
 }
 
-.quiz-result-stat-open,
-.quiz-result-stat-open :is(span, svg) {
+.quiz-result-card .quiz-result-stat-open,
+.quiz-result-card .quiz-result-stat-open :is(span, svg) {
   background: #fff7ed !important;
   border-color: #fdba74 !important;
-  color: #1e1b4b !important;
-  -webkit-text-fill-color: #1e1b4b !important;
+  color: #9a3412 !important;
+  -webkit-text-fill-color: #9a3412 !important;
 }
 
 .quiz-result-quote {
@@ -6311,11 +6332,11 @@ html.dark .quiz-result-card :is(h2, p, span) {
 
 .quiz-result-card button.quiz-result-save,
 .quiz-result-card button.quiz-result-save :is(span, svg) {
-  background-color: #6d28d9 !important;
-  background-image: linear-gradient(180deg, #8b5cf6, #6d28d9) !important;
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff !important;
-  border-color: #c4b5fd !important;
+  background: #fff7ed !important;
+  background-image: none !important;
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+  border-color: #fdba74 !important;
 }
 
 .quiz-result-card button.quiz-result-retake,
@@ -10946,6 +10967,225 @@ html.dark .admin-user-profile-dialog .admin-profile-status[data-status="Assigned
   background: rgb(255 255 255 / 0.16) !important;
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
+}
+
+[data-slot="dialog-content"]:has(#front),
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) {
+  width: min(40rem, calc(100vw - 2rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))) !important;
+  max-width: min(40rem, calc(100vw - 2rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))) !important;
+  gap: 0.85rem !important;
+  border: 1px solid #e7d7c3 !important;
+  border-radius: 1.25rem !important;
+  background: #fff8ee !important;
+  color: #1e1b4b !important;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 0.28) !important;
+}
+
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) {
+  width: min(34rem, calc(100vw - 2rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))) !important;
+  max-width: min(34rem, calc(100vw - 2rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))) !important;
+}
+
+[data-slot="dialog-content"]:has(#front) :is(h2, p, label, span),
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) :is(h2, p, label, span) {
+  color: #1e1b4b;
+  -webkit-text-fill-color: #1e1b4b;
+}
+
+[data-slot="dialog-content"]:has(#front) .text-muted-foreground,
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) .text-muted-foreground {
+  color: #6b6280 !important;
+  -webkit-text-fill-color: #6b6280 !important;
+}
+
+[data-slot="dialog-content"]:has(#front) [data-slot="tabs-list"] {
+  height: auto !important;
+  border-radius: 999px !important;
+  background: #f5f3ff !important;
+  padding: 0.25rem !important;
+}
+
+[data-slot="dialog-content"]:has(#front) [data-slot="tabs-trigger"] {
+  border-radius: 999px !important;
+  color: #5b21b6 !important;
+  -webkit-text-fill-color: #5b21b6 !important;
+}
+
+[data-slot="dialog-content"]:has(#front) [data-slot="tabs-trigger"][data-active],
+[data-slot="dialog-content"]:has(#front) [data-slot="tabs-trigger"][data-active] :is(span, svg) {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+[data-slot="dialog-content"]:has(#front) :is(textarea, input),
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) :is(textarea, input) {
+  border: 1px solid #e7d7c3 !important;
+  border-radius: 0.85rem !important;
+  background: #ffffff !important;
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+}
+
+[data-slot="dialog-content"]:has(#front) textarea {
+  min-height: 4.25rem !important;
+}
+
+[data-slot="dialog-content"]:has(#front) .rounded-lg.border {
+  border-color: #eadfce !important;
+  border-radius: 1rem !important;
+  background: #fffdf8 !important;
+}
+
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) .rounded-lg.border {
+  border-color: #eadfce !important;
+  border-radius: 1rem !important;
+  background: #ffffff !important;
+  padding: 0.9rem 1rem !important;
+}
+
+[data-slot="dialog-content"]:has(#front) [data-slot="dialog-footer"],
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) [data-slot="dialog-footer"] {
+  margin-top: 0.15rem;
+  border-top-color: #eadfce !important;
+  background: #fff3e4 !important;
+}
+
+[data-slot="dialog-content"]:has(#front) [data-slot="button"][data-variant="default"],
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) [data-slot="button"][data-variant="default"],
+[data-slot="dialog-content"]:has(#front) [data-slot="button"][data-variant="default"] :is(span, svg),
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) [data-slot="button"][data-variant="default"] :is(span, svg) {
+  border-radius: 999px !important;
+  background: #7c3aed !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+[data-slot="dialog-content"]:has(#front) [data-slot="button"][data-variant="outline"],
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) [data-slot="button"][data-variant="outline"],
+[data-slot="dialog-content"]:has(#front) [data-slot="button"][data-variant="outline"] :is(span, svg),
+[data-slot="dialog-content"]:has(#submit-save-user-inbox) [data-slot="button"][data-variant="outline"] :is(span, svg) {
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  background-image: none !important;
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+  border-color: #ddd6fe !important;
+}
+
+[data-slot="dialog-content"]:has(#front) [data-slot="dialog-close"] {
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+}
+
+.quiz-result-card button.quiz-result-save[data-slot="button"],
+.quiz-result-card button.quiz-result-save[data-slot="button"] :is(span, svg),
+.quiz-result-card .quiz-result-stat-open,
+.quiz-result-card .quiz-result-stat-open :is(span, svg) {
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+}
+
+.quiz-result-card .quiz-result-stat-open,
+.quiz-result-card .quiz-result-stat-open :is(span, svg) {
+  color: #9a3412 !important;
+  -webkit-text-fill-color: #9a3412 !important;
+}
+
+/* Phone Chrome: the logo row must show every header icon.
+   Plans, the plan badge, and UI Guides collapse to icons so the
+   account, docs, help, and inbox buttons stay on screen. */
+@media (max-width: 720px) {
+  html:not([data-flipvise-native-shell]) [data-app-header]:has([data-header-tools]) {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-pills],
+  html:not([data-flipvise-native-shell]) [data-header-center],
+  html:not([data-flipvise-native-shell]) [data-header-workspace] {
+    grid-column: 1 / -1 !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-pills] {
+    grid-row: 2 !important;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-center] {
+    grid-row: 3 !important;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-workspace] {
+    grid-row: 3 !important;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-app-header]:has([data-header-center]) [data-header-workspace] {
+    grid-row: 4 !important;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-tools] {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    justify-self: stretch;
+    justify-content: flex-end;
+    gap: 0.15rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-tools]::-webkit-scrollbar {
+    display: none;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-icon-tools],
+  html:not([data-flipvise-native-shell]) [data-header-promo-links] {
+    flex: 0 0 auto;
+    gap: 0.15rem;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-tools] .header-plans-pill,
+  html:not([data-flipvise-native-shell]) [data-header-tools] .header-guides-pill,
+  html:not([data-flipvise-native-shell]) [data-header-tools] .header-plan-badge,
+  html:not([data-flipvise-native-shell]) [data-header-icon-tools] [data-slot="button"][data-size="icon"] {
+    width: 2rem !important;
+    min-width: 2rem !important;
+    max-width: 2rem !important;
+    height: 2rem !important;
+    padding-inline: 0 !important;
+    justify-content: center;
+    gap: 0 !important;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-tools] .header-plans-pill span,
+  html:not([data-flipvise-native-shell]) [data-header-tools] .header-guides-pill span {
+    display: none !important;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-tools] .header-plan-badge {
+    overflow: hidden !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-tools] .header-plan-badge svg {
+    width: 0.9rem !important;
+    height: 0.9rem !important;
+    font-size: 0.9rem !important;
+  }
+
+  html:not([data-flipvise-native-shell]) [data-header-tools] .header-avatar-shell {
+    width: 2rem;
+    height: 2rem;
+  }
 }
 
 .team-admin-surface [data-slot="progress-indicator"] {
