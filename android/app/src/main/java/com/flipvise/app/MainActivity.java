@@ -33,6 +33,7 @@ public class MainActivity extends BridgeActivity {
      */
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(FlipviseShellPlugin.class);
         super.onCreate(savedInstanceState);
         // Keep the WebView below the status / navigation bars so live-site UI
         // (← Dashboard, headers, sticky panels) never draws under the signal bar.

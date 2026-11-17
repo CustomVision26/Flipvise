@@ -1866,6 +1866,7 @@ export function QuizStudy({
                         "border-white/40 bg-white/10 text-white placeholder:text-white/50",
                     )}
                     aria-label="Fill in the blank"
+                    placeholder="Type your answer"
                     autoComplete="off"
                   />
                 ),

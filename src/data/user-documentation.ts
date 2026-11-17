@@ -258,7 +258,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Tap “Sync” (or reopen Flipvise online) to upload offline changes and download updates from your other devices.",
           "An amber banner appears across the app whenever you are offline so you know online-only features are paused.",
           "While offline, the native sign-in screen shows a notice that sign-in and sign-up need a connection, plus “Back to offline study” at the bottom.",
-          "Signing out inside the mobile app returns you to offline study (your downloaded decks) rather than the online sign-in page.",
+          "Signing out of the dashboard inside the mobile app also signs you out of offline study and returns you to the signed-out offline screen, not the online sign-in page. Your downloaded decks stay on the device and show again after you sign in.",
           "Opening the online dashboard in the native app uses an in-app sign-in screen (not the website modal): email sign-in code is the default; password works only if you set one on the web. While signed out, that screen hides the add-on banner and shows the artwork behind the sign-in card. A site update shows one Update available notice; Refresh loads the new page.",
           "New users can tap “New to Flipvise? Create an account” on the sign-in screen to register with first name, last name, phone, account type, email, password, and password confirmation, then verify with an email code — no separate sign-up page.",
           "If sign-in says the account was not found, tap “Create an account with this email” to switch to registration.",

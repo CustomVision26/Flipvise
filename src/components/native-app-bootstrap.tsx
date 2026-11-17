@@ -115,6 +115,7 @@ export function NativeAppBootstrap() {
 
     void import("@/lib/offline/session")
       .then(async (s) => {
+        if (await s.getRequireManualSignIn().catch(() => false)) return;
         await s.setStoredUserId(userId);
         await s.setStoredApiBaseUrl(window.location.origin);
       })
@@ -139,6 +140,10 @@ export function NativeAppBootstrap() {
     }
 
     void import("@/lib/offline/session").then(async (session) => {
+      // Sign-out sets this flag before the WebView leaves. Do not write the
+      // Clerk user back over a logout that is already in progress.
+      if (await session.getRequireManualSignIn().catch(() => false)) return;
+
       // Keep the offline shell's user id in sync whenever the live dashboard loads
       // (not only after "Make available offline") so a cold start can load SQLite rows.
       if (isSignedIn && userId) {
@@ -162,6 +167,7 @@ export function NativeAppBootstrap() {
         if (!res.ok) return;
         const data = (await res.json()) as { token?: string };
         if (!data.token) return;
+        if (await session.getRequireManualSignIn().catch(() => false)) return;
         await session.setStoredSyncToken(data.token);
         await session.setStoredApiBaseUrl(window.location.origin);
         await session.setRequireManualSignIn(false);

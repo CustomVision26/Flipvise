@@ -28,7 +28,7 @@ export function AccountMenu({
   planAccessType?: string;
   /** True when this device already has an offline study sign-in. */
   signedIn?: boolean;
-  /** Opens the live site in the phone browser. */
+  /** Opens the live Flipvise site in the phone's browser. */
   onOpenInBrowser?: () => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);

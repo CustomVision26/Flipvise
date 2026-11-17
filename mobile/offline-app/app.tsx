@@ -23,6 +23,7 @@ import type {
 import {
   consumeOfflineLibraryMigrationPendingSync,
   defaultOfflineAccessContext,
+  getOfflineAccessContext,
   offlineViewerCanSpeak,
   offlineViewerHasAiReading,
   resolveOfflineAccountPlanDisplay,
@@ -37,6 +38,7 @@ import {
   getStoredApiBaseUrl,
   getStoredSyncToken,
   getStoredUserId,
+  clearStoredSyncCredentials,
   getRequireManualSignIn,
   setLastNavigationUrl,
   setNativeAppFlag,
@@ -78,6 +80,22 @@ const LIVE_URL =
  * bare `localhost` to `127.0.0.1` (use with `adb reverse tcp:3000 tcp:3000`) so Clerk
  * sees a localhost-equivalent origin without hitting Capacitor’s shell host.
  */
+function withTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => resolve(fallback), ms);
+    work.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        window.clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
+
 function bundledLiveUrl(): string {
   const raw = LIVE_URL.replace(/\/$/, "");
   try {
@@ -249,6 +267,21 @@ export function App() {
     let cancelled = false;
     (async () => {
       try {
+        // Dashboard sign-out sets this before leaving the live site. Honor it
+        // before reading the stored user, and drop leftover credentials so the
+        // next sign-in starts clean.
+        const signedOut = await getRequireManualSignIn().catch(() => false);
+        if (cancelled) return;
+        if (signedOut) {
+          setUserId(null);
+          setDecks([]);
+          setAccessContext(defaultOfflineAccessContext());
+          setDbReady(true);
+          setLibraryReady(true);
+          void clearStoredSyncCredentials().catch(() => {});
+          return;
+        }
+
         const DB_BOOT_TIMEOUT_MS = 15_000;
         const available = await Promise.race([
           isOfflineDbAvailable(),
@@ -284,25 +317,16 @@ export function App() {
           );
         }
 
-        let ctx = uid
-          ? await ensureAccessContextFresh({ userId: uid })
-          : defaultOfflineAccessContext();
+        // Paint the saved library immediately. A server refresh runs after this
+        // screen is visible, so returning from the dashboard does not flash the
+        // signed-out "Personal Dash - Free" / "Loading decks" screen.
+        const cached = uid ? await getOfflineAccessContext().catch(() => null) : null;
+        let ctx =
+          uid && cached && (!cached.userId || cached.userId === uid)
+            ? cached
+            : defaultOfflineAccessContext();
         if (cancelled) return;
-
-        if (
-          uid &&
-          ctx.userId &&
-          ctx.userId !== uid &&
-          (await getStoredSyncToken().catch(() => null))
-        ) {
-          await resetSyncPullCursor().catch(() => {});
-          ctx = await ensureAccessContextFresh({
-            userId: uid,
-            force: true,
-            fullPull: true,
-          });
-          if (cancelled) return;
-        }
+        setAccessContext(ctx);
 
         if (uid && (await consumeOfflineLibraryMigrationPendingSync())) {
           await resetSyncPullCursor().catch(() => {});
@@ -318,11 +342,7 @@ export function App() {
           await repairTeamWorkspaceDeckRows(uid, ctx.workspaces).catch(() => {});
           if (cancelled) return;
           let rows = await loadDecks(uid, scope, ctx);
-          if (
-            !cancelled &&
-            scope !== "personal" &&
-            rows.length === 0
-          ) {
+          if (!cancelled && scope !== "personal" && rows.length === 0) {
             const personalRows = await loadDecks(uid, "personal", ctx);
             if (personalRows.length > 0) {
               scope = "personal";
@@ -524,16 +544,23 @@ export function App() {
   const showTeacherDashboard = accessContext.showTeacherDashboard ?? false;
 
   const openLivePath = useCallback(async (path: string) => {
-    const storedBase = await getStoredApiBaseUrl().catch(() => null);
     const base = bundledLiveUrl();
+    const [storedBase, requireManualSignIn, syncToken] = await withTimeout(
+      Promise.all([
+        getStoredApiBaseUrl().catch(() => null),
+        getRequireManualSignIn().catch(() => false),
+        getStoredSyncToken().catch(() => null),
+      ]),
+      1500,
+      [null, false, null] as [string | null, boolean, string | null],
+    );
     if (storedBase !== base) {
-      await setStoredApiBaseUrl(base).catch(() => {});
+      void setStoredApiBaseUrl(base).catch(() => {});
     }
 
     const enc = (s: string) => encodeURIComponent(s);
     const nativeQuery = "flipvise_native=1";
     const retryDestination = liveDestinationUrl(base, path);
-    const requireManualSignIn = await getRequireManualSignIn().catch(() => false);
     let target = `${base}/native-signin?${nativeQuery}&redirect=${enc(path)}`;
     if (requireManualSignIn) {
       target += "&session_retry=1";
@@ -545,7 +572,7 @@ export function App() {
       } catch {
         // ignore
       }
-      await setLastNavigationUrl(retryDestination).catch(() => {});
+      void setLastNavigationUrl(retryDestination).catch(() => {});
       window.location.href = `./error.html?offline=1&url=${enc(retryDestination)}`;
       return;
     }
@@ -560,29 +587,23 @@ export function App() {
     //   • first-time users → a lightweight in-app email/password (or email code)
     //     form, then redirect to `path`.
     //   • already-signed-in WebView sessions → redirect straight to `path`.
-    if (!requireManualSignIn) {
+    // The handoff call is capped so a stalled request cannot leave the button
+    // on "Opening…" with the offline screen still showing.
+    if (!requireManualSignIn && syncToken) {
       try {
-        const syncToken = await getStoredSyncToken().catch(() => null);
-        if (syncToken) {
-          const res = await fetch(`${base}/api/native/clerk-handoff`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${syncToken}` },
-          });
-          if (res.ok) {
-            const data = (await res.json()) as { ticket?: string };
-            if (data.ticket) {
-              target = `${base}/native-signin?${nativeQuery}&ticket=${enc(data.ticket)}&redirect=${enc(path)}`;
-            }
-          } else if (import.meta.env.DEV) {
-            console.warn(
-              `[openLivePath] clerk-handoff failed (${res.status}) — manual sign-in`,
-            );
+        const res = await fetch(`${base}/api/native/clerk-handoff`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${syncToken}` },
+          signal: AbortSignal.timeout(3500),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { ticket?: string };
+          if (data.ticket) {
+            target = `${base}/native-signin?${nativeQuery}&ticket=${enc(data.ticket)}&redirect=${enc(path)}`;
           }
         }
-      } catch (err) {
-        if (import.meta.env.DEV) {
-          console.warn("[openLivePath] clerk-handoff error — manual sign-in", err);
-        }
+      } catch {
+        // Open the sign-in page without a ticket. The dashboard still loads.
       }
     }
 
@@ -592,7 +613,10 @@ export function App() {
     } catch {
       // ignore
     }
-    await setLastNavigationUrl(retryDestination).catch(() => {});
+    void setLastNavigationUrl(retryDestination).catch(() => {});
+    // Stay inside the app WebView. Chrome Custom Tabs and Safari views show a
+    // browser setup screen ("Make Chrome your own") on phones and tablets that
+    // have never signed into the browser, and the Flipvise page never appears.
     window.location.replace(target);
   }, []);
 
@@ -668,50 +692,19 @@ export function App() {
   const openLiveApp = useCallback(() => {
     if (openingLive) return;
     setOpeningLive(true);
-    void openLivePath("/dashboard");
-    window.setTimeout(() => setOpeningLive(false), 20_000);
+    void openLivePath("/dashboard").finally(() => {
+      window.setTimeout(() => setOpeningLive(false), 400);
+    });
   }, [openLivePath, openingLive]);
 
   const openAccountInBrowser = useCallback(async () => {
-    const base = bundledLiveUrl();
-    const home = `${base}/`;
-    const open = async (url: string) => {
-      try {
-        const { Browser } = await import("@capacitor/browser");
-        await Browser.open({ url });
-      } catch {
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
-    };
-
-    if (!userId || !navigator.onLine) {
-      await open(home);
-      return;
-    }
-
-    try {
-      const syncToken = await getStoredSyncToken().catch(() => null);
-      if (syncToken) {
-        const res = await fetch(`${base}/api/native/clerk-handoff`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${syncToken}` },
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { ticket?: string };
-          if (data.ticket) {
-            const target = `${base}/native-signin?ticket=${encodeURIComponent(data.ticket)}&redirect=${encodeURIComponent("/dashboard")}`;
-            await open(target);
-            return;
-          }
-        }
-      }
-    } catch {
-      // The browser still opens. A missing ticket lands on the home page.
-    }
-    await open(home);
-  }, [userId]);
-
-  const libraryLoading = dbReady === null || !libraryReady || scopeLoading;
+    // Leave the app. Android opens Chrome; iPhone opens Safari.
+    const url = `${bundledLiveUrl()}/`;
+    const { FlipviseShell } = await import(
+      "../../src/lib/capacitor/flipvise-shell-plugin"
+    );
+    await FlipviseShell.openExternal({ url });
+  }, []);
 
   if (dbReady === false) {
     const dbHint = getLastOfflineDbError();
@@ -724,6 +717,7 @@ export function App() {
           syncing={syncing}
           openingLive={openingLive}
           signedIn={Boolean(userId)}
+          showAccount
           onOpenAccount={openAccountInBrowser}
         />
         <div className="content">
@@ -741,6 +735,23 @@ export function App() {
             )}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!libraryReady) {
+    return (
+      <div className="app">
+        <Topbar
+          online={online}
+          onOpen={openLiveApp}
+          onSync={handleSync}
+          syncing={syncing}
+          openingLive={openingLive}
+          signedIn={false}
+          showAccount={false}
+        />
+        <div className="content content--library" />
       </div>
     );
   }
@@ -836,12 +847,13 @@ export function App() {
         accountPlanLabel={accountPlanDisplay.plan}
         accountPlanAccessType={accountPlanDisplay.planType}
         signedIn={Boolean(userId)}
+        showAccount
         onOpenAccount={openAccountInBrowser}
       />
       <div className="content content--library">
         <DeckLibrary
           decks={decks}
-          loading={libraryLoading}
+          loading={scopeLoading}
           message={message}
           online={online}
           workspaceScope={workspaceScope}
@@ -905,6 +917,7 @@ function Topbar({
   accountPlanLabel,
   accountPlanAccessType,
   signedIn = false,
+  showAccount = true,
   onOpenAccount,
 }: {
   online: boolean;
@@ -918,6 +931,7 @@ function Topbar({
   accountPlanLabel?: string;
   accountPlanAccessType?: string;
   signedIn?: boolean;
+  showAccount?: boolean;
   onOpenAccount?: () => void | Promise<void>;
 }) {
   return (
@@ -943,7 +957,7 @@ function Topbar({
           <button
             type="button"
             className="btn secondary btn--sm topbar-actions__online-dash"
-            onPointerDown={() => {
+            onClick={() => {
               if (!online || openingLive) return;
               onOpen();
             }}
@@ -958,14 +972,16 @@ function Topbar({
           isPro={appearanceAccess?.isPro}
           hasProPlusInterfacePalette={appearanceAccess?.hasProPlusInterfacePalette}
         />
-        <AccountMenu
-          displayName={viewerDisplayName}
-          email={viewerEmail}
-          planLabel={accountPlanLabel}
-          planAccessType={accountPlanAccessType}
-          signedIn={signedIn}
-          onOpenInBrowser={onOpenAccount}
-        />
+        {showAccount ? (
+          <AccountMenu
+            displayName={viewerDisplayName}
+            email={viewerEmail}
+            planLabel={accountPlanLabel}
+            planAccessType={accountPlanAccessType}
+            signedIn={signedIn}
+            onOpenInBrowser={onOpenAccount}
+          />
+        ) : null}
       </div>
     </header>
   );

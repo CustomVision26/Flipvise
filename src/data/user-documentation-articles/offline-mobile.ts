@@ -48,7 +48,7 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
           "Your place, edits, and quiz results are stored locally on the device.",
           "An amber banner shows across the app while you are offline.",
           "If you reach the sign-in screen while offline, it is replaced by a short notice and an “Offline study” button — sign-in needs a connection, so this jumps straight to your downloaded decks.",
-          "Signing out inside the mobile app drops you back into offline study (your downloaded decks), not the online sign-in page.",
+          "Signing out of the dashboard inside the mobile app also signs you out of offline study and opens the signed-out offline screen, not the online sign-in page. Downloaded decks stay on the device and appear again the next time you sign in.",
         ],
       },
       {
