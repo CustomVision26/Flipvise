@@ -231,86 +231,86 @@ export function AssignUserPlanButton({
           }
         }}
       >
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Send plan assignment request</AlertDialogTitle>
-            <AlertDialogDescription>
+        <AlertDialogContent
+          data-flipvise-plan-assign-dialog=""
+          className="gap-4 border-2 p-5 text-left"
+        >
+          <AlertDialogHeader className="flex flex-col items-start gap-3 text-left">
+            <AlertDialogTitle className="text-lg font-semibold leading-snug">
+              Send plan assignment request
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left text-sm leading-relaxed">
               The user will get an inbox message and must <strong>accept</strong> before any plan
               change is applied. If they have an active Stripe subscription, accepting may update
               their subscription with proration.
             </AlertDialogDescription>
-            <div className="space-y-3 text-left text-sm text-muted-foreground">
-              {/* ── Resolution context ── */}
-              <div className="rounded-md border border-border bg-muted/40 px-3 py-2.5 space-y-2 text-xs">
-                <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Current plan state</p>
-                {/* Resolved plan */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground">Resolved plan</span>
-                  <span className="font-medium text-foreground">
+            <div className="w-full space-y-3 text-left text-sm">
+              <div className="plan-assign-panel space-y-2 px-3 py-2.5 text-sm">
+                <p className="plan-assign-kicker">Current plan state</p>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="plan-assign-label">Resolved plan</span>
+                  <span className="plan-assign-value">
                     {currentResolvedPlan && currentResolvedPlan !== "Free" ? currentResolvedPlan : "Free"}
                   </span>
                 </div>
-                {/* Billing source */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground">Stripe billing</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="plan-assign-label">Stripe billing</span>
                   <span className="flex items-center gap-1.5">
-                    <span className="font-medium text-foreground">{billingPlan ?? "—"}</span>
+                    <span className="plan-assign-value">{billingPlan ?? "—"}</span>
                     {billingStatus && (
-                      <span className={cn("font-medium", billingStatusBadge(billingStatus).color)}>
+                      <span className={cn("plan-assign-status", billingStatusBadge(billingStatus).color)}>
                         ({billingStatusBadge(billingStatus).label})
                       </span>
                     )}
                   </span>
                 </div>
                 {billingPlanUpdatedAt && (
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-muted-foreground">Billing updated</span>
-                    <span className="text-foreground">{fmtDate(billingPlanUpdatedAt)}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="plan-assign-label">Billing updated</span>
+                    <span className="plan-assign-value">{fmtDate(billingPlanUpdatedAt)}</span>
                   </div>
                 )}
-                {/* Admin source */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground">Admin override</span>
-                  <span className="font-medium text-foreground">{adminPlan ?? "—"}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="plan-assign-label">Admin override</span>
+                  <span className="plan-assign-value">{adminPlan ?? "—"}</span>
                 </div>
                 {adminPlanUpdatedAt && (
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-muted-foreground">Override set</span>
-                    <span className="text-foreground">{fmtDate(adminPlanUpdatedAt)}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="plan-assign-label">Override set</span>
+                    <span className="plan-assign-value">{fmtDate(adminPlanUpdatedAt)}</span>
                   </div>
                 )}
-                {/* What will happen */}
                 {pending && (
-                  <>
-                    <div className="border-t border-border my-1" />
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-muted-foreground">Plan if accepted</span>
-                      <span className="font-semibold text-foreground">
-                        {labelForAdminPlanAssignment(pending)}
-                      </span>
-                    </div>
-                  </>
+                  <div className="plan-assign-next flex items-center justify-between gap-3">
+                    <span className="plan-assign-label">Plan if accepted</span>
+                    <span className="plan-assign-value">
+                      {labelForAdminPlanAssignment(pending)}
+                    </span>
+                  </div>
                 )}
               </div>
 
-              <p>
+              <p className="plan-assign-note text-sm leading-relaxed">
                 Nothing changes on their account until they open the dashboard inbox and click{" "}
                 <strong>Accept</strong>. They can also decline the request.
               </p>
-              <AdminUserIdentityBlock
-                name={targetUserName}
-                email={targetUserEmail}
-                userId={targetUserId}
-              />
+              <div className="plan-assign-identity">
+                <AdminUserIdentityBlock
+                  name={targetUserName}
+                  email={targetUserEmail}
+                  userId={targetUserId}
+                />
+              </div>
             </div>
           </AlertDialogHeader>
           {error && (
-            <p className="px-6 text-sm text-destructive" role="alert">
+            <p className="plan-assign-error text-sm" role="alert">
               {error}
             </p>
           )}
           <AlertDialogFooter>
             <AlertDialogCancel
+              className="h-10 border-2"
               onClick={() => {
                 if (!isPending) setError(null);
               }}
@@ -319,6 +319,7 @@ export function AssignUserPlanButton({
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
+              className="h-10 border-2"
               onClick={(e) => {
                 e.preventDefault();
                 onConfirm();

@@ -47,7 +47,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Search by name or email; filter by plan, role (admin/user), and online/offline/banned status.",
           "Table columns include phone, type/status, and Admin accessed (last time an admin opened the profile dialog).",
           "Double-click a row to open the profile dialog with plan, billing, phone, mailing address, type/status, and security Q&A; each open records Admin accessed date/time.",
-          "Assign User Plan grants complimentary or admin-assigned tiers including Education Plus, Education Gold, and Education Enterprise (invite-before-commit for changes).",
+          "Assign User Plan grants complimentary or admin-assigned tiers including Education Plus, Education Gold, and Education Enterprise (invite-before-commit for changes). The request dialog stays readable in light and dark mode.",
           "Ban User blocks sign-in; banned users show a destructive badge.",
         ],
         requirements: ["Platform admin access."],

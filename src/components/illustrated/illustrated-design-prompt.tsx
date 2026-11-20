@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+/** Personal deck dashboard only — not team, admin, or account-setup routes. */
+const PERSONAL_DASHBOARD_PATH = "/dashboard";
 
 function storageKey(userId: string) {
   return `flipvise-illustrated-prompt:${userId}`;
@@ -38,9 +42,15 @@ function clickAppearanceNav(): boolean {
 
 export function IllustratedDesignPrompt() {
   const appearance = useIllustratedAppearance();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const onPersonalDashboard = pathname === PERSONAL_DASHBOARD_PATH;
 
   useEffect(() => {
+    if (!onPersonalDashboard) {
+      setOpen(false);
+      return;
+    }
     if (!appearance.userId || appearance.loading) return;
     if (appearance.effectiveIllustratedDesign) {
       setOpen(false);
@@ -53,6 +63,7 @@ export function IllustratedDesignPrompt() {
     }
     setOpen(true);
   }, [
+    onPersonalDashboard,
     appearance.userId,
     appearance.loading,
     appearance.effectiveIllustratedDesign,
@@ -105,43 +116,52 @@ export function IllustratedDesignPrompt() {
       }}
     >
       <DialogContent className="illustrated-prompt-dialog sm:max-w-xl">
-        <Image
-          src="/artwork/home/illustrated-prompt-owl.png"
-          alt=""
-          width={180}
-          height={180}
-          className="illustrated-prompt-owl"
-        />
-        <DialogHeader className="illustrated-prompt-copy">
-          <DialogTitle>Illustrated deck design</DialogTitle>
-          <DialogDescription>
-            Cartoon artwork, layered cards, and illustrated backgrounds are
-            included on every plan, including Free. Study content and plan
-            features stay the same.
-          </DialogDescription>
-        </DialogHeader>
-        <p className="illustrated-prompt-where">
-          Open the account button, choose Manage account, then Appearance.
-          Turn on Illustrated Deck Design there.
-        </p>
-        {!appearance.globalEnabled ? (
-          <p className="illustrated-prompt-note">
-            Illustrated designs are temporarily unavailable. Your choice is
-            kept and applied when they return.
-          </p>
-        ) : null}
-        <DialogFooter className="illustrated-prompt-footer">
-          <Button type="button" variant="outline" onClick={dismiss}>
-            Not now
-          </Button>
-          <Button
-            type="button"
-            className="illustrated-prompt-open"
-            onClick={() => void openAppearance()}
-          >
-            Open Appearance
-          </Button>
-        </DialogFooter>
+        <div className="illustrated-prompt-layout">
+          <div className="illustrated-prompt-copy">
+            <DialogHeader className="gap-2 text-left sm:text-left">
+              <DialogTitle>Illustrated deck design</DialogTitle>
+              <DialogDescription>
+                Cartoon artwork, layered cards, and illustrated backgrounds are
+                included on every plan, including Free. Study content and plan
+                features stay the same.
+              </DialogDescription>
+            </DialogHeader>
+            <p className="illustrated-prompt-where">
+              Open the account button, choose Manage account, then Appearance.
+              Turn on Illustrated Deck Design there.
+            </p>
+            {!appearance.globalEnabled ? (
+              <p className="illustrated-prompt-note">
+                Illustrated designs are temporarily unavailable. Your choice is
+                kept and applied when they return.
+              </p>
+            ) : null}
+            <DialogFooter className="illustrated-prompt-footer">
+              <Button
+                type="button"
+                variant="outline"
+                className="illustrated-prompt-dismiss"
+                onClick={dismiss}
+              >
+                Not now
+              </Button>
+              <Button
+                type="button"
+                className="illustrated-prompt-open"
+                onClick={() => void openAppearance()}
+              >
+                Open Appearance
+              </Button>
+            </DialogFooter>
+          </div>
+          <Image
+            src="/artwork/home/illustrated-prompt-owl.png"
+            alt=""
+            width={180}
+            height={180}
+            className="illustrated-prompt-owl"
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

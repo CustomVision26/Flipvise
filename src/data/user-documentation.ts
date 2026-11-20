@@ -293,7 +293,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Unified notification center for invites, billing, quiz results, affiliate messages, support tickets, and your one-time welcome message.",
         howItWorks: [
-          "Inbox tab shows unread and actionable items. The page is a solid illustrated board with a messenger owl, a fox, and purple Inbox and Open controls, and it stays readable in light and dark.",
+          "Inbox tab shows unread and actionable items. Refresh reloads messages without leaving the page. The page is a solid illustrated board with a messenger owl, a fox, and purple Inbox, Refresh, and Open controls, and it stays readable in light and dark.",
           "History tab shows completed or read items.",
           "New accounts receive a formal Welcome to Flipvise message with getting-started tips.",
           "After sign-in on web, PWA, or the mobile app, a brief welcome toast appears at the top of the screen.",
@@ -959,7 +959,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Permanently remove your Flipvise account and associated data.",
         howItWorks: [
           "Clerk Security → Delete account is intercepted by Flipvise.",
-          "A confirmation dialog explains consequences and any prorated refund.",
+          "A confirmation dialog explains consequences and any prorated refund. The warning, DELETE field, and buttons stay readable in light and dark mode.",
           "Type DELETE, then re-enter your sign-in credentials to permanently delete.",
         ],
         requirements: ["Signed-in account."],

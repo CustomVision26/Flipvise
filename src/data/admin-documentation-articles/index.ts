@@ -88,7 +88,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Admin plan assignment uses an invite-before-commit flow for most changes. The target user receives an inbox invite and must accept before Clerk metadata and Stripe billing update. Complimentary grants skip Stripe; paid upgrades on active subscriptions trigger Stripe proration on accept.",
         ],
         bullets: [
-          "Menu groups: Clear & personal (Free, Pro, Pro Plus), Team tiers (Team Basic, Team Gold, Platinum, Enterprise), and Education tiers (Education Plus, Education Gold, Education Enterprise).",
+          "Menu groups: Clear & personal (Free, Pro, Pro Plus), Team tiers (Team Basic, Team Gold, Platinum, Enterprise), and Education tiers (Education Plus, Education Gold, Education Enterprise). The confirmation dialog stays readable in light and dark mode.",
           "Pending invites appear in the user's dashboard inbox — plan is not applied until accepted.",
           "Direct override (support tool) exists for immediate metadata writes without user consent — use only for testing or emergency support, not for initiating real billing.",
           "Plan Assignment History tab logs every admin-initiated grant, change, or revocation.",

@@ -26,7 +26,7 @@ export default async function TermsPage() {
       <LegalDocument
         badge="Terms"
         title="Terms of Service"
-        description="Effective October 12, 2026. These terms cover the Flipvise website and the Flipvise iPhone and Android apps."
+        description="Updated November 19, 2026. These terms cover the Flipvise website and the Flipvise iPhone and Android apps from Flipvise Studio LLC."
         sections={[
           {
             id: "using-flipvise",
@@ -35,8 +35,9 @@ export default async function TermsPage() {
             tone: "cyan",
             body: (
               <p>
-                Flipvise provides flashcards, study tools, classrooms, and optional AI features. You
-                may use them for your own learning or for a class or workspace you are allowed to
+                Flipvise provides flashcards, study tools, classrooms, and optional AI features for
+                people 13 and older. Do not create an account if you are under 13. You may use
+                Flipvise for your own learning or for a class or workspace you are allowed to
                 manage. You are responsible for the content you add and for keeping your sign-in
                 private.
               </p>
@@ -53,9 +54,16 @@ export default async function TermsPage() {
                 <Link href="/privacy" className="text-primary underline-offset-4 hover:underline">
                   Privacy Policy
                 </Link>
-                . Sign-in is provided by Clerk. After sign-up, Flipvise asks for the recovery details
-                shown on account setup. You can delete the account from the account menu, under
-                Manage account, by confirming with DELETE.
+                . Sign-in is provided by Clerk. After sign-up, Flipvise asks for your phone number,
+                mailing address, account type, and three security answers. You can request deletion
+                of the account and its associated data from the{" "}
+                <Link
+                  href="/account-deletion"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  delete your account and data
+                </Link>{" "}
+                steps.
               </p>
             ),
           },
@@ -96,7 +104,8 @@ export default async function TermsPage() {
             body: (
               <p>
                 When you generate study material, the topic or source text you submit is sent to
-                OpenAI to produce the result. How that data is handled is described on the{" "}
+                OpenAI over HTTPS to produce the result. Flipvise does not sell that data. How it
+                is handled is described on the{" "}
                 <Link href="/ai" className="text-primary underline-offset-4 hover:underline">
                   AI data handling
                 </Link>{" "}

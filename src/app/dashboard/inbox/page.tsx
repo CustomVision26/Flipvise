@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Inbox } from "lucide-react";
+import { InboxRefreshButton } from "@/components/inbox-refresh-button";
 import { currentUser } from "@/lib/clerk-auth";
 import { auth } from "@clerk/nextjs/server";
 
@@ -680,6 +681,7 @@ export default async function DashboardInboxPage() {
             Quiz results, team invitations, subscription confirmations, billing, affiliate invites and notices, affiliate admin
             broadcasts, administrator plan requests, completed plan changes, support replies, and your welcome message.
           </p>
+          <InboxRefreshButton />
         </div>
         <Link
           href="/dashboard"

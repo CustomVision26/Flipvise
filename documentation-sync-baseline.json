@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-11-17T14:16:59.790Z",
+  "updatedAt": "2026-11-18T01:07:50.335Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "5ce6f266238ea320067c5f1553af7eb853e467babdbd5e8571c0076ffcf33129",
@@ -39,8 +39,8 @@
       "docFingerprint": "655b5035fb3acc2e39600820066f95ae7060a4b8b720ed8eaee01ae1dcc4785d"
     },
     "inbox": {
-      "watchFingerprint": "02ea0a419a2fa1021d3f800875df939fda7167aaee6172685bbf7d97701c266d",
-      "docFingerprint": "f476517fd8926bac2fe308bbc2de7d1e17e499f57925e5def2dd72e2338f062e"
+      "watchFingerprint": "df652e4dd837e677de91e8c3d6a4e9f3d7cf6f03afc0bc5ad53645d521481aaa",
+      "docFingerprint": "8f9bf7614f749e33c3d502d8bbc7d50ff7b8b8b65c9749eb3f14bfeecc230611"
     },
     "help-center-overview": {
       "watchFingerprint": "19cca7668b130cf6c563dfbf32b5b2a1f1bbf8e81a59261bff4dd5a2f8a2c1de",
@@ -151,8 +151,8 @@
       "docFingerprint": "f93b0cb2e257f3056e47c4ed4e8f88e99c5f26003025a5654f5161a4502c4d62"
     },
     "account-delete": {
-      "watchFingerprint": "8237211751a54516df3135926d8a3df9f9ab545d792cb386edad4d53d47297ab",
-      "docFingerprint": "7566f9ba03902c638d1c395233e8c8dce2300b147a75f73df1fb06464dfbf88a"
+      "watchFingerprint": "ea1e22788c894eab518203ddc749f1e0df1c85d09546a11f496fdf60b7e9c5cf",
+      "docFingerprint": "552a98c5d56f4be9fe02f3b38e61490055e54341ed224408be9af113e8670268"
     },
     "team-admin-overview": {
       "watchFingerprint": "81a05745c0641ee5c55c1f4ed2d611ac6fc74a66163a40493eba7256698e23e5",
@@ -227,8 +227,8 @@
       "docFingerprint": "29e870bd682b030e9604c601a33a6e4af9eb64ef743ad062db57167d8f8508b4"
     },
     "all-users": {
-      "watchFingerprint": "4d8df99c6add6c91dacbdc049c917cfd8829d283c40718add4757813223044b7",
-      "docFingerprint": "a9b2401dc4809d42afedc13e8abe261cb31f31b3d90cbf218f50efb2f1c66c1e"
+      "watchFingerprint": "deadb440ee9492b6d18de10edf4b7ac72c4d1983ef72e5e79b2ed2526cbd3e5c",
+      "docFingerprint": "cca6f4d3f92d84af7e7cf4228da8cc0b156e74abcdde95636307aff10f58953a"
     },
     "subscription": {
       "watchFingerprint": "cc50cf05885b989c7c7e2a31b0ecd407a6c14daf872566cf23da0cdd10b60c54",

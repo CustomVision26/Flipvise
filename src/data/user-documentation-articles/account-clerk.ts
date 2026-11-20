@@ -149,7 +149,7 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
         title: "Deletion flow",
         bullets: [
           "Clerk Security → Delete account triggers Flipvise interception.",
-          "Confirmation dialog explains consequences and any prorated refund.",
+          "Confirmation dialog explains consequences and any prorated refund, and stays readable in light and dark mode.",
           "Type DELETE, then re-enter your sign-in credentials — irreversible.",
         ],
       },

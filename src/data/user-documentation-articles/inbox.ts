@@ -21,7 +21,7 @@ export const INBOX_ARTICLES: DocArticle[] = [
         bullets: [
           "Inbox tab — unread and actionable items requiring your attention.",
           "History tab — completed, read, or archived notifications.",
-          "Header badge shows pending inbox count.",
+          "Header badge shows pending inbox count. Refresh reloads messages without leaving the page.",
         ],
       },
       {

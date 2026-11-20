@@ -19,7 +19,7 @@ export default async function AiDataPage() {
       <LegalDocument
         badge="AI"
         title="AI data handling"
-        description="Effective October 12, 2026. This page explains what happens when you use AI in Flipvise."
+        description="Updated November 19, 2026. This page explains what happens when you use AI in Flipvise. AI features are for people 13 and older."
         sections={[
           {
             id: "what-is-sent",
@@ -30,8 +30,9 @@ export default async function AiDataPage() {
               <p>
                 Flashcards, quizzes, lesson plans, homework, worksheets, study guides, essays,
                 document import, and voice features send the topic, deck text, or source you submit
-                to OpenAI so it can return the result. The model used for generation is GPT-4o.
-                Flipvise does not send your password or your card number with those requests.
+                to OpenAI over HTTPS so it can return the result. The model used for generation is
+                GPT-4o. Flipvise does not sell that data. Those requests do not include your
+                password, card number, phone number, mailing address, or security answers.
               </p>
             ),
           },
@@ -68,9 +69,14 @@ export default async function AiDataPage() {
             tone: "teal",
             body: (
               <p>
-                Open your account menu, choose Manage account, then Delete account, and confirm with
-                DELETE. Deleting the account removes the Flipvise account and the study data stored
-                for it.
+                Request deletion of the Flipvise account and the study data stored for it from the{" "}
+                <Link
+                  href="/account-deletion"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  delete your account and data
+                </Link>{" "}
+                steps. You can do this on the website without installing the app.
               </p>
             ),
           },

@@ -3,12 +3,14 @@ import Link from "next/link";
 import {
   BookOpen,
   CreditCard,
+  Lock,
   Mail,
   MessageSquare,
   Shield,
   Smartphone,
   Sparkles,
   UserRound,
+  Users,
 } from "lucide-react";
 import { LegalDocument } from "@/components/legal-document";
 import { PublicMarketingPageChrome } from "@/components/public-marketing-page-chrome";
@@ -28,8 +30,20 @@ export default async function PrivacyPage() {
       <LegalDocument
         badge="Privacy"
         title="Privacy Policy"
-        description="Effective October 10, 2026. This page describes the Flipvise website and the Flipvise iPhone and Android apps."
+        description="Updated November 19, 2026. This page describes the Flipvise website and the Flipvise iPhone and Android apps from Flipvise Studio LLC."
         sections={[
+          {
+            id: "age",
+            title: "Ages 13 and up",
+            icon: Users,
+            tone: "cyan",
+            body: (
+              <p>
+                Flipvise is for people 13 and older. Do not create an account if you are under 13.
+                The website and the iPhone and Android apps are not directed to children under 13.
+              </p>
+            ),
+          },
           {
             id: "account",
             title: "Account information",
@@ -38,8 +52,9 @@ export default async function PrivacyPage() {
             body: (
               <p>
                 When you create an account, Flipvise stores your name, email address, and the
-                sign-in method you choose (email code or password), plus the recovery details you
-                enter after sign-up. Sign-in is provided by Clerk.
+                sign-in method you choose (email code or password). After sign-up, account setup
+                stores your phone number, mailing address, account type, and three security
+                answers. Sign-in is provided by Clerk.
               </p>
             ),
           },
@@ -91,14 +106,36 @@ export default async function PrivacyPage() {
             tone: "violet",
             body: (
               <p>
-                When you generate study material, the topic or source text you submit is sent to
-                OpenAI to produce the result. The result is saved in your account. Usage records
-                store the feature, model, and token counts, not the prompt. Details are on the{" "}
+                When you generate study material, the topic, deck text, or source file you submit
+                is sent to OpenAI over HTTPS to produce the result. Flipvise does not send your
+                password, card number, phone number, mailing address, or security answers with
+                those requests. The result is saved in your account. Usage records store the
+                feature, model, and token counts, not the prompt. Details are on the{" "}
                 <Link href="/ai" className="text-primary underline-offset-4 hover:underline">
                   AI data handling
                 </Link>{" "}
                 page.
               </p>
+            ),
+          },
+          {
+            id: "security",
+            title: "Encryption and sale of data",
+            icon: Lock,
+            tone: "violet",
+            body: (
+              <>
+                <p>
+                  Data sent between the Flipvise app or website and Flipvise is encrypted in
+                  transit with HTTPS. Requests to OpenAI and to Loops, which sends account and
+                  invite email, use HTTPS as well.
+                </p>
+                <p className="mt-3">
+                  Flipvise does not sell user data. Loops receives only what an email needs, such
+                  as the address, name, and link or message summary. OpenAI receives only the
+                  topic, deck text, or file for that generation.
+                </p>
+              </>
             ),
           },
           {
@@ -115,15 +152,21 @@ export default async function PrivacyPage() {
           },
           {
             id: "delete-account",
-            title: "Deleting your account",
+            title: "Delete your account and data",
             icon: Shield,
             tone: "teal",
             body: (
               <p>
-                Open your account menu, choose Manage account, then Delete account, and confirm
-                with DELETE. Deleting the account removes the Flipvise account and its study data.
-                If a paid subscription is refunded, Stripe sends the prorated amount to the
-                original payment method.
+                Request deletion of your Flipvise account and the data associated with it on the{" "}
+                <Link
+                  href="/account-deletion"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  delete your Flipvise account
+                </Link>{" "}
+                page from Flipvise Studio LLC. That page lists the steps, the data that is
+                deleted, the data that is kept, and the retention period. You do not need the app
+                installed to read it.
               </p>
             ),
           },

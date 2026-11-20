@@ -133,18 +133,20 @@ export function AccountDeleteDialog() {
     <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <AlertDialogContent
         data-flipvise-delete-dialog
-        className="sm:max-w-lg z-[200000]"
+        className="z-[200000] gap-5 border-2 border-border bg-background p-5 text-foreground shadow-2xl sm:max-w-lg"
       >
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <TriangleAlert className="size-5 text-destructive shrink-0" aria-hidden />
+        <AlertDialogHeader className="grid-rows-[auto_auto_auto] gap-4 text-left sm:place-items-start sm:text-left">
+          <AlertDialogTitle className="flex items-start gap-3 text-left text-lg font-semibold text-foreground">
+            <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-destructive/40 bg-destructive/15 text-destructive">
+              <TriangleAlert className="size-5 shrink-0" aria-hidden />
+            </span>
             Delete your account permanently?
           </AlertDialogTitle>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <AlertDialogDescription>
+          <div className="delete-account-warning space-y-3 rounded-lg border p-3 text-sm">
+            <AlertDialogDescription className="text-left text-sm font-medium text-foreground">
               This action is immediate and irreversible. The following will happen:
             </AlertDialogDescription>
-            <ul className="list-disc pl-5 space-y-1.5 text-muted-foreground">
+            <ul className="list-disc space-y-1.5 pl-5 text-left text-foreground">
               <li>
                 All decks, cards, quiz history, team workspaces you own, and inbox
                 data will be permanently deleted.
@@ -157,7 +159,7 @@ export function AccountDeleteDialog() {
                 You will be signed out immediately and cannot recover this account.
               </li>
               {previewLoading ? (
-                <li className="flex items-center gap-2 list-none -ml-5 text-muted-foreground">
+                <li className="-ml-5 flex list-none items-center gap-2 text-foreground">
                   <Loader2 className="size-3.5 animate-spin" aria-hidden />
                   Checking subscription…
                 </li>
@@ -183,10 +185,12 @@ export function AccountDeleteDialog() {
                 <li>Free accounts are not charged; no refund applies.</li>
               )}
             </ul>
-            {previewError ? <p className="text-xs">{previewError}</p> : null}
+            {previewError ? (
+              <p className="text-sm font-medium text-destructive">{previewError}</p>
+            ) : null}
           </div>
-          <div className="space-y-2 pt-2" data-flipvise-delete-dialog>
-            <Label htmlFor="delete-confirm" className="text-foreground">
+          <div className="space-y-2 text-left" data-flipvise-delete-dialog>
+            <Label htmlFor="delete-confirm" className="text-sm font-semibold text-foreground">
               Type <span className="font-mono font-semibold">DELETE</span> to confirm
             </Label>
             <Input
@@ -196,22 +200,35 @@ export function AccountDeleteDialog() {
               placeholder="DELETE"
               autoComplete="off"
               disabled={isPending}
+              className="h-11 border-2 border-border bg-background text-base text-foreground placeholder:text-muted-foreground"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-foreground/80">
               Next you will be asked to re-enter your sign-in credentials before the
               account is deleted.
             </p>
           </div>
         </AlertDialogHeader>
-        <AlertDialogFooter data-flipvise-delete-dialog>
-          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+        <AlertDialogFooter
+          data-flipvise-delete-dialog
+          className="mx-0 mb-0 gap-3 rounded-lg border border-border bg-muted p-3"
+        >
+          <AlertDialogCancel
+            disabled={isPending}
+            className="h-10 border-2 border-border bg-background text-foreground hover:bg-muted"
+          >
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             disabled={!confirmReady || isPending || previewLoading}
             onClick={(e) => {
               e.preventDefault();
               handleDelete();
             }}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className={
+              confirmReady
+                ? "h-10 border-transparent bg-destructive text-white hover:bg-destructive/90 disabled:opacity-100"
+                : "h-10 border-2 border-border bg-background text-foreground disabled:opacity-100"
+            }
           >
             {isPending ? "Deleting…" : "Yes, delete my account"}
           </AlertDialogAction>
