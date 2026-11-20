@@ -297,6 +297,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/flipvise-invoice-receipt-view.tsx",
   ],
   "account-delete": ["src/components/account-delete-dialog.tsx"],
+  "account-deletion-request": ["src/app/account-deletion/page.tsx"],
   "team-admin-overview": [
     "src/components/team-admin-manage-tabs.tsx",
     "src/components/team-admin-quick-nav-panel.tsx",
@@ -446,10 +447,14 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/lib/admin/serialize-admin-users.ts",
     "src/lib/admin-user-account-details.ts",
     "src/actions/admin.ts",
+    "src/actions/admin-user-records.ts",
     "src/components/admin-tabs.tsx",
+    "src/components/admin-user-profile-dialog.tsx",
     "src/components/assign-user-plan-button.tsx",
     "src/lib/admin-assignable-plans.ts",
     "src/db/queries/admin.ts",
+    "src/db/queries/admin-user-records.ts",
+    "src/db/queries/admin-plan-record-access.ts",
   ],
   subscription: ["src/lib/admin/admin-billing-snapshot.ts", "src/db/queries/stripe-subscriptions.ts"],
   "subscription-monitor": [

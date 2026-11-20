@@ -163,4 +163,51 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
       },
     ],
   ),
+  a(
+    "account-deletion-request",
+    "Account deletion request — In-Depth Guide",
+    "The public page at /account-deletion explains how to request deletion of a Flipvise account and what happens to the data.",
+    [
+      {
+        id: "steps",
+        title: "Steps to request deletion",
+        bullets: [
+          "Open https://learn.flipvisestudio.com/account-deletion. The Android app does not need to be installed.",
+          "If you can sign in: open learn.flipvisestudio.com or the Flipvise app, sign in with the account you want deleted, then open the account menu → Manage account → Delete account.",
+          "Type DELETE and confirm with your sign-in. Deletion is permanent and finishes when you confirm.",
+          "If you cannot sign in: send the request from Contact Us and include the email address on the Flipvise account. Flipvise Studio LLC deletes that account and its data after the email is matched.",
+        ],
+      },
+      {
+        id: "deleted",
+        title: "Data deleted",
+        paragraphs: [
+          "There is no additional retention period. Signed-in deletion finishes when you confirm DELETE. A Contact Us request finishes when the email is matched and the deletion is completed. Flipvise does not keep this data after that.",
+        ],
+        bullets: [
+          "Account name, email address, and sign-in.",
+          "Phone number, mailing address, account type, and security answers.",
+          "Decks, cards, images, quiz results, lesson plans, homework, essays, and class records stored for that account.",
+          "Inbox messages, support messages, push tokens, and AI usage records for that account.",
+        ],
+      },
+      {
+        id: "kept",
+        title: "Data kept",
+        bullets: [
+          "A copy of decks stored only on your phone for offline study stays on that device until you remove the Flipvise app or its storage. Flipvise does not keep a server copy of that account after deletion.",
+          "Study content owned by another account, such as a class workspace you joined, stays with that owner.",
+          "Stripe keeps the payment record for a prorated refund and for Stripe’s own legal records. Flipvise does not store the card number and does not keep a separate copy after the account is deleted.",
+        ],
+      },
+      {
+        id: "contact",
+        title: "Contact",
+        bullets: [
+          "Questions about deleting a Flipvise account can be sent from Contact Us.",
+          "The Privacy Policy describes the rest of the data Flipvise collects.",
+        ],
+      },
+    ],
+  ),
 ];

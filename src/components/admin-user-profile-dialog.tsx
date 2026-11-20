@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DialogContent,
   DialogDescription,
@@ -20,6 +21,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getAdminUserRecordsAction,
+  setAdminPlanRecordActiveAction,
   type AdminUserRecordsResult,
 } from "@/actions/admin-user-records";
 import type { SerializedUser } from "@/lib/admin-dashboard-types";
@@ -127,6 +129,27 @@ function CountChip({ value }: { value: number }) {
   return <span className="admin-profile-count">{value}</span>;
 }
 
+function ActiveMark({
+  checked,
+  label,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  disabled?: boolean;
+  onChange?: (checked: boolean) => void;
+}) {
+  return (
+    <Checkbox
+      checked={checked}
+      disabled={disabled || !onChange}
+      aria-label={label}
+      onCheckedChange={(next) => onChange?.(next === true)}
+    />
+  );
+}
+
 function columnKey(columns: string[], index: number) {
   return columns[index] ?? String(index);
 }
@@ -151,6 +174,8 @@ export function AdminUserProfileDialog({
   const [records, setRecords] = useState<AdminUserRecordsResult | null>(null);
   const [recordsError, setRecordsError] = useState<string | null>(null);
   const [loadingRecords, setLoadingRecords] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,6 +196,35 @@ export function AdminUserProfileDialog({
       cancelled = true;
     };
   }, [user.id]);
+
+  async function toggleOwnedRecord(input: {
+    key: string;
+    teamId: number;
+    memberUserId?: string;
+    active: boolean;
+  }) {
+    setSavingKey(input.key);
+    setAccessError(null);
+    const result = await setAdminPlanRecordActiveAction({
+      ownerUserId: user.id,
+      teamId: input.teamId,
+      memberUserId: input.memberUserId,
+      active: input.active,
+    });
+    if (!result.ok) {
+      setAccessError(result.message);
+      setSavingKey(null);
+      return;
+    }
+    try {
+      const fresh = await getAdminUserRecordsAction({ targetUserId: user.id });
+      setRecords(fresh);
+    } catch {
+      setAccessError("The change was saved, but the list could not be refreshed.");
+    } finally {
+      setSavingKey(null);
+    }
+  }
 
   const accountType =
     user.accountType && ACCOUNT_TYPE_VALUES.includes(user.accountType as AccountType)
@@ -289,9 +343,15 @@ export function AdminUserProfileDialog({
                 <SubTable title="Personal decks" tone="sky">
                   <RecordTable
                     tone="sky"
-                    columns={["Deck", "Cards", "Created"]}
+                    columns={["Active", "Deck", "Cards", "Created"]}
                     empty="No personal decks."
                     rows={records.personalDecks.map((deck) => [
+                      <ActiveMark
+                        key={`deck-${deck.id}`}
+                        checked={deck.allowed}
+                        disabled
+                        label={`${deck.name} is ${deck.allowed ? "on" : "off"}`}
+                      />,
                       deck.name,
                       <CountChip key={deck.id} value={deck.cardCount} />,
                       formatWhen(deck.createdAt, true),
@@ -311,6 +371,11 @@ export function AdminUserProfileDialog({
                   records.invitedWorkspaces.map((workspace) => (
                     <article key={workspace.teamId} className="admin-profile-record" data-tone="emerald">
                       <header>
+                        <ActiveMark
+                          checked={workspace.allowed}
+                          disabled
+                          label={`${workspace.name} membership is ${workspace.allowed ? "on" : "off"}`}
+                        />
                         <p className="font-semibold">{workspace.name}</p>
                         <Badge variant="outline">{workspace.role}</Badge>
                         <span>Joined {formatWhen(workspace.joinedAt, true)}</span>
@@ -318,9 +383,15 @@ export function AdminUserProfileDialog({
                       <SubTable title="Assigned decks" tone="sky">
                         <RecordTable
                           tone="sky"
-                          columns={["Assigned deck", "Cards", "Record created"]}
+                          columns={["Active", "Assigned deck", "Cards", "Record created"]}
                           empty="No decks assigned in this workspace."
                           rows={workspace.assignedDecks.map((deck) => [
+                            <ActiveMark
+                              key={`assigned-${workspace.teamId}-${deck.id}`}
+                              checked={deck.allowed}
+                              disabled
+                              label={`${deck.name} is ${deck.allowed ? "on" : "off"}`}
+                            />,
                             deck.name,
                             <CountChip key={deck.id} value={deck.cardCount} />,
                             formatWhen(deck.createdAt, true),
@@ -336,11 +407,29 @@ export function AdminUserProfileDialog({
                 <section className="admin-profile-card" data-tone="rose">
                   <h3>Workspaces owned</h3>
                   <p className="admin-profile-note">
-                    Team plan owner workspaces, invited members and roles, linked decks, and who each deck is assigned to.
+                    Every workspace and member from this subscriber’s larger plan stays listed.
+                    A checked box is on for {records.planAccess.planLabel}
+                    {records.planAccess.maxTeams > 0
+                      ? ` (${records.planAccess.maxTeams} workspaces, ${records.planAccess.maxMembersPerTeam} members each)`
+                      : ""}
+                    . Unchecked rows stay saved. Turn one off to free a slot, then turn on the one the subscriber asked for.
                   </p>
+                  {accessError ? <p className="text-sm text-destructive">{accessError}</p> : null}
                   {records.ownedWorkspaces.map((workspace) => (
                     <article key={workspace.teamId} className="admin-profile-record" data-tone="rose">
                       <header>
+                        <ActiveMark
+                          checked={workspace.allowed}
+                          disabled={savingKey != null}
+                          label={`${workspace.name} is ${workspace.allowed ? "on" : "off"}`}
+                          onChange={(active) =>
+                            void toggleOwnedRecord({
+                              key: `workspace-${workspace.teamId}`,
+                              teamId: workspace.teamId,
+                              active,
+                            })
+                          }
+                        />
                         <p className="font-semibold">{workspace.name}</p>
                         <Badge variant="secondary">Deck limit {workspace.deckLimit}</Badge>
                         <span>Created {formatWhen(workspace.createdAt, true)}</span>
@@ -348,9 +437,23 @@ export function AdminUserProfileDialog({
                       <SubTable title="Invited members" tone="amber">
                         <RecordTable
                           tone="amber"
-                          columns={["Member", "Role", "Deck limit", "Joined"]}
+                          columns={["Active", "Member", "Role", "Deck limit", "Joined"]}
                           empty="No invited members."
                           rows={workspace.members.map((member) => [
+                            <ActiveMark
+                              key={`member-${workspace.teamId}-${member.userId}`}
+                              checked={member.allowed}
+                              disabled={savingKey != null || !workspace.allowed}
+                              label={`${personLabel(records.names, member.userId)} is ${member.allowed ? "on" : "off"}`}
+                              onChange={(active) =>
+                                void toggleOwnedRecord({
+                                  key: `member-${workspace.teamId}-${member.userId}`,
+                                  teamId: workspace.teamId,
+                                  memberUserId: member.userId,
+                                  active,
+                                })
+                              }
+                            />,
                             personLabel(records.names, member.userId),
                             member.role,
                             member.deckLimit == null ? "—" : <CountChip key={member.userId} value={member.deckLimit} />,
@@ -361,9 +464,15 @@ export function AdminUserProfileDialog({
                       <SubTable title="Linked decks" tone="sky">
                         <RecordTable
                           tone="sky"
-                          columns={["Deck", "Cards", "Linked"]}
+                          columns={["Active", "Deck", "Cards", "Linked"]}
                           empty="No linked decks."
                           rows={workspace.linkedDecks.map((deck) => [
+                            <ActiveMark
+                              key={`linked-${workspace.teamId}-${deck.id}`}
+                              checked={deck.allowed}
+                              disabled
+                              label={`${deck.name} is ${deck.allowed ? "on" : "off"}`}
+                            />,
                             deck.name,
                             <CountChip key={deck.id} value={deck.cardCount} />,
                             formatWhen(deck.createdAt, true),

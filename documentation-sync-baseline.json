@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-11-18T01:07:50.335Z",
+  "updatedAt": "2026-11-20T02:14:23.869Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "5ce6f266238ea320067c5f1553af7eb853e467babdbd5e8571c0076ffcf33129",
@@ -154,6 +154,10 @@
       "watchFingerprint": "ea1e22788c894eab518203ddc749f1e0df1c85d09546a11f496fdf60b7e9c5cf",
       "docFingerprint": "552a98c5d56f4be9fe02f3b38e61490055e54341ed224408be9af113e8670268"
     },
+    "account-deletion-request": {
+      "watchFingerprint": "cd433223920569c7079f611efb1cc2fcd0e33c7bd340ab8d18cffa6b553dd53c",
+      "docFingerprint": "5dd606fa84d7b6ae969ba255318fb4ffeab1290e02a0914e8456a9d842ae4fb6"
+    },
     "team-admin-overview": {
       "watchFingerprint": "81a05745c0641ee5c55c1f4ed2d611ac6fc74a66163a40493eba7256698e23e5",
       "docFingerprint": "03f2acfff3c15ccbc12fed4314f6e71303df25835b73a558008388e993218449"
@@ -227,8 +231,8 @@
       "docFingerprint": "29e870bd682b030e9604c601a33a6e4af9eb64ef743ad062db57167d8f8508b4"
     },
     "all-users": {
-      "watchFingerprint": "deadb440ee9492b6d18de10edf4b7ac72c4d1983ef72e5e79b2ed2526cbd3e5c",
-      "docFingerprint": "cca6f4d3f92d84af7e7cf4228da8cc0b156e74abcdde95636307aff10f58953a"
+      "watchFingerprint": "ab59c0be8d99c1214c5059f5636eab8c3ba014d7963818debb28087c8daaaa27",
+      "docFingerprint": "bd776784eacc5545be7f77640fec427620423f2c6211a486f409e0d94ad9b4e8"
     },
     "subscription": {
       "watchFingerprint": "cc50cf05885b989c7c7e2a31b0ecd407a6c14daf872566cf23da0cdd10b60c54",

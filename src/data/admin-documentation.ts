@@ -44,6 +44,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose: "Search, filter, and manage every registered Clerk user.",
         howItWorks: [
           "The All Users profile window uses formal colored Profile, Records, and History tabs for personal decks, invited workspaces, owner assignments, current and previous plans, and deleted decks and cards with their dates.",
+          "On Records, a plan owner’s workspaces and members from a larger plan stay listed. A checked box is on for the current plan. Unchecked rows stay saved. Turn one off to free a slot, then turn on the workspace or member the subscriber asked for. The save is rejected when it would pass the current workspace or member cap.",
           "Search by name or email; filter by plan, role (admin/user), and online/offline/banned status.",
           "Table columns include phone, type/status, and Admin accessed (last time an admin opened the profile dialog).",
           "Double-click a row to open the profile dialog with plan, billing, phone, mailing address, type/status, and security Q&A; each open records Admin accessed date/time.",
@@ -54,6 +55,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not ban the platform owner/superadmin.",
           "Do not assign plans to yourself without understanding billing side-effects.",
+          "Do not turn on more workspaces or members than the subscriber’s current plan allows — the save is rejected.",
         ],
       },
       {

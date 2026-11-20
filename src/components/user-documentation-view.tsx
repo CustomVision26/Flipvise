@@ -44,6 +44,18 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import plansConfigData from "@/data/plans-config.json";
+import type { PlanConfig } from "@/lib/plan-config-types";
+import { isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
+import {
+  FREE_CARDS_PER_DECK_LIMIT,
+  FREE_PERSONAL_DECK_LIMIT,
+  PRO_CARDS_PER_DECK_LIMIT,
+  PRO_PERSONAL_DECK_LIMIT,
+  PRO_PLUS_CARDS_PER_DECK_LIMIT,
+  PRO_PLUS_PERSONAL_DECK_LIMIT,
+} from "@/lib/personal-plan-limits";
+import { limitsForPlan } from "@/lib/team-plans";
 import { useClientMounted } from "@/lib/use-client-mounted";
 import { useDocumentationMobileNav, documentationContentPanelClass, documentationTocAsideClass } from "@/lib/use-documentation-mobile-nav";
 import { cn } from "@/lib/utils";
@@ -852,41 +864,70 @@ function DocContentSkeleton() {
   );
 }
 
+function capsForPlan(planId: string) {
+  if (planId === "free") {
+    return {
+      decks: FREE_PERSONAL_DECK_LIMIT,
+      cards: FREE_CARDS_PER_DECK_LIMIT,
+      workspaces: null as number | null,
+      members: null as number | null,
+    };
+  }
+  if (planId === "pro") {
+    return {
+      decks: PRO_PERSONAL_DECK_LIMIT,
+      cards: PRO_CARDS_PER_DECK_LIMIT,
+      workspaces: null,
+      members: null,
+    };
+  }
+  if (isWorkspaceSubscriptionPlanSlug(planId)) {
+    const limits = limitsForPlan(planId);
+    return {
+      decks: limits.maxDecksPerWorkspace,
+      cards: PRO_PLUS_CARDS_PER_DECK_LIMIT,
+      workspaces: limits.maxTeams,
+      members: limits.maxMembersPerTeam,
+    };
+  }
+  return {
+    decks: PRO_PLUS_PERSONAL_DECK_LIMIT,
+    cards: PRO_PLUS_CARDS_PER_DECK_LIMIT,
+    workspaces: null,
+    members: null,
+  };
+}
+
 function PlanLimitsCard() {
-  const tiers = [
-    { name: "Free", decks: "2 decks", cards: "5 cards / deck" },
-    { name: "Pro", decks: "10 decks", cards: "30 cards / deck" },
-    {
-      name: "Pro Plus / team-tier",
-      decks: "15 decks",
-      cards: "52 cards / deck",
-    },
-    {
-      name: "Education Plus",
-      decks: "15 decks",
-      cards: "52 cards / deck",
-    },
-  ] as const;
+  const plans = plansConfigData as PlanConfig[];
 
   return (
     <Card className="docs-panel border-cyan-400/30 bg-cyan-500/5 shadow-none ring-1 ring-cyan-400/20">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">
-          Quick plan limits (personal)
-        </CardTitle>
+        <CardTitle className="text-base font-semibold">Quick plan limits</CardTitle>
         <CardDescription>
-          Deck and card caps for individual workspaces.
+          What each plan includes, plus deck, card, workspace, and member caps.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-border/60">
-          {tiers.map((tier) => (
-            <div key={tier.name} className="space-y-1 px-0 lg:px-4 lg:first:pl-0 lg:last:pr-0">
-              <p className="text-sm font-medium text-foreground">{tier.name}</p>
-              <p className="text-sm text-muted-foreground">{tier.decks}</p>
-              <p className="text-xs text-muted-foreground">{tier.cards}</p>
-            </div>
-          ))}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {plans.map((plan) => {
+            const caps = capsForPlan(plan.id);
+            return (
+              <div key={plan.id} className="space-y-1 border-b border-border/60 pb-4">
+                <p className="text-sm font-medium text-foreground">{plan.name}</p>
+                <p className="text-sm text-muted-foreground">{plan.description}</p>
+                <p className="text-xs text-foreground">
+                  {caps.decks} decks · {caps.cards} cards / deck
+                </p>
+                <p className="text-xs text-foreground">
+                  {caps.workspaces == null
+                    ? "No workspaces"
+                    : `${caps.workspaces} workspaces · ${caps.members} members each`}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

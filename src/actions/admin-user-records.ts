@@ -3,7 +3,16 @@
 import { createClerkClient } from "@clerk/backend";
 import { z } from "zod";
 import { auth } from "@/lib/clerk-auth";
+import { revalidatePath } from "next/cache";
 import { getAdminUserRecords, type AdminUserRecords } from "@/db/queries/admin-user-records";
+import {
+  adminPlanRecordLimits,
+  markOwnedRecordsAllowed,
+  setOwnedWorkspaceActiveForPlan,
+  setOwnedWorkspaceMemberActiveForPlan,
+  type AdminPlanRecordLimits,
+} from "@/db/queries/admin-plan-record-access";
+import { resolveAdminUserPlanBillingContext } from "@/lib/admin-user-plan-label";
 import {
   isClerkPlatformAdminRole,
   isClerkSuperadminRole,
@@ -25,7 +34,15 @@ export type AdminUserDirectoryName = {
 
 export type AdminUserRecordsResult = AdminUserRecords & {
   names: Record<string, AdminUserDirectoryName>;
+  planAccess: AdminPlanRecordLimits;
 };
+
+const toggleSchema = z.object({
+  ownerUserId: z.string().min(1),
+  teamId: z.number().int().positive(),
+  memberUserId: z.string().min(1).optional(),
+  active: z.boolean(),
+});
 
 async function requirePlatformAdmin() {
   const { userId } = await auth();
@@ -58,7 +75,34 @@ export async function getAdminUserRecordsAction(
   const parsed = recordsSchema.safeParse(input);
   if (!parsed.success) throw new Error("Invalid input");
 
-  const records = await getAdminUserRecords(parsed.data.targetUserId);
+  return loadAdminUserRecords(parsed.data.targetUserId);
+}
+
+async function ownerPlanSlug(userId: string): Promise<string> {
+  const user = await clerkClient.users.getUser(userId);
+  const plan = resolveAdminUserPlanBillingContext(
+    (user.publicMetadata ?? {}) as Parameters<typeof resolveAdminUserPlanBillingContext>[0],
+  );
+  return plan.effectivePlanSlug ?? "free";
+}
+
+async function loadAdminUserRecords(targetUserId: string): Promise<AdminUserRecordsResult> {
+  const [records, planSlug] = await Promise.all([
+    getAdminUserRecords(targetUserId),
+    ownerPlanSlug(targetUserId),
+  ]);
+  const names = await directoryNames(records);
+  return {
+    ...records,
+    ownedWorkspaces: markOwnedRecordsAllowed(records.ownedWorkspaces, planSlug),
+    names,
+    planAccess: adminPlanRecordLimits(planSlug),
+  };
+}
+
+async function directoryNames(
+  records: AdminUserRecords,
+): Promise<Record<string, AdminUserDirectoryName>> {
   const ids = new Set<string>();
   for (const workspace of records.ownedWorkspaces) {
     for (const member of workspace.members) ids.add(member.userId);
@@ -78,5 +122,34 @@ export async function getAdminUserRecordsAction(
       }
     }),
   );
-  return { ...records, names };
+  return names;
+}
+
+export async function setAdminPlanRecordActiveAction(
+  input: z.infer<typeof toggleSchema>,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  await requirePlatformAdmin();
+  const parsed = toggleSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Invalid input" };
+
+  const planSlug = await ownerPlanSlug(parsed.data.ownerUserId);
+  const result = parsed.data.memberUserId
+    ? await setOwnedWorkspaceMemberActiveForPlan({
+        ownerUserId: parsed.data.ownerUserId,
+        teamId: parsed.data.teamId,
+        memberUserId: parsed.data.memberUserId,
+        active: parsed.data.active,
+        planSlug,
+      })
+    : await setOwnedWorkspaceActiveForPlan({
+        ownerUserId: parsed.data.ownerUserId,
+        teamId: parsed.data.teamId,
+        active: parsed.data.active,
+        planSlug,
+      });
+  if (!result.ok) return result;
+
+  revalidatePath("/dashboard");
+  revalidatePath("/admin");
+  return { ok: true };
 }

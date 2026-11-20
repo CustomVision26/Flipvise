@@ -78,7 +78,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Filter by status: online, offline, or banned.",
           "Phone and Type/status columns show account details from Clerk public metadata when set.",
           "Admin accessed shows the last date/time a platform admin opened that user's profile dialog.",
-          "Double-click a row to open the profile dialog. Profile shows billing, phone, mailing address, type/status, and security Q&A. Records shows personal decks, invited workspaces, and, for a team plan owner, members, linked decks, and assignments. History shows the current plan, earlier plans, and deleted decks and cards with date and time. Opening the dialog refreshes private security answers and logs Admin accessed.",
+          "Double-click a row to open the profile dialog. Profile shows billing, phone, mailing address, type/status, and security Q&A. Records shows personal decks, invited workspaces, and, for a team plan owner, members, linked decks, and assignments. A checked box is a workspace or member the current plan allows. Unchecked rows from a larger plan stay saved. Turn one off to free a slot, then turn on the one the subscriber asked for. History shows the current plan, earlier plans, and deleted decks and cards with date and time. Opening the dialog refreshes private security answers and logs Admin accessed.",
         ],
       },
       {
@@ -109,6 +109,7 @@ const ALL_ARTICLES: DocArticle[] = [
         title: "Do not",
         bullets: [
           "Do not assign plans to yourself without understanding billing side-effects.",
+          "Do not turn on more workspaces or members than the subscriber’s current plan allows — the save is rejected.",
           "Do not treat the Plan column alone as proof of Stripe payment — verify Subscription and Invoices tabs.",
         ],
       },

@@ -19,6 +19,10 @@ export type AdminDeckRecord = {
   name: string;
   cardCount: number;
   createdAt: string;
+  /** Null while the deck is on. Set when plan reconciliation turned it off. */
+  inactiveAt: string | null;
+  /** Checked in admin Records when the deck itself is still on. */
+  allowed: boolean;
 };
 
 export type AdminAssignedDeckRecord = AdminDeckRecord & {
@@ -31,6 +35,8 @@ export type AdminInvitedWorkspaceRecord = {
   name: string;
   role: string;
   joinedAt: string;
+  /** This member’s row is on and the workspace itself is on. */
+  allowed: boolean;
   assignedDecks: AdminDeckRecord[];
 };
 
@@ -39,12 +45,18 @@ export type AdminWorkspaceMemberRecord = {
   role: string;
   deckLimit: number | null;
   joinedAt: string;
+  inactiveAt: string | null;
+  /** Checked when this member is one of the seats the current plan allows. */
+  allowed: boolean;
 };
 
 export type AdminOwnedWorkspaceRecord = {
   teamId: number;
   name: string;
   createdAt: string;
+  inactiveAt: string | null;
+  /** Checked when this workspace is one of the ones the current plan allows. */
+  allowed: boolean;
   deckLimit: number;
   members: AdminWorkspaceMemberRecord[];
   linkedDecks: AdminDeckRecord[];
@@ -96,6 +108,7 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
       id: decks.id,
       name: decks.name,
       createdAt: decks.createdAt,
+      inactiveAt: decks.inactiveAt,
     })
     .from(decks)
     .where(and(eq(decks.userId, userId), isNull(decks.teamId)))
@@ -107,6 +120,8 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
       role: teamMembers.role,
       joinedAt: teamMembers.createdAt,
       teamName: teams.name,
+      memberInactiveAt: teamMembers.inactiveAt,
+      teamInactiveAt: teams.inactiveAt,
     })
     .from(teamMembers)
     .innerJoin(teams, eq(teams.id, teamMembers.teamId))
@@ -118,6 +133,7 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
       name: teams.name,
       planSlug: teams.planSlug,
       createdAt: teams.createdAt,
+      inactiveAt: teams.inactiveAt,
     })
     .from(teams)
     .where(eq(teams.ownerUserId, userId))
@@ -168,13 +184,14 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
     ownedIds.length === 0
       ? []
       : await db
-          .select({
-            teamId: teamMembers.teamId,
-            userId: teamMembers.userId,
-            role: teamMembers.role,
-            joinedAt: teamMembers.createdAt,
-            maxCreateDecks: teamMembers.maxCreateDecks,
-          })
+    .select({
+      teamId: teamMembers.teamId,
+      userId: teamMembers.userId,
+      role: teamMembers.role,
+      joinedAt: teamMembers.createdAt,
+      inactiveAt: teamMembers.inactiveAt,
+      maxCreateDecks: teamMembers.maxCreateDecks,
+    })
           .from(teamMembers)
           .where(inArray(teamMembers.teamId, ownedIds));
 
@@ -190,7 +207,12 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
     uniqueDeckIds.length === 0
       ? []
       : await db
-          .select({ id: decks.id, name: decks.name, createdAt: decks.createdAt })
+          .select({
+            id: decks.id,
+            name: decks.name,
+            createdAt: decks.createdAt,
+            inactiveAt: decks.inactiveAt,
+          })
           .from(decks)
           .where(inArray(decks.id, uniqueDeckIds));
   const deckById = new Map(deckRows.map((deck) => [deck.id, deck]));
@@ -203,6 +225,8 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
       name: deck.name,
       cardCount: counts.get(id) ?? 0,
       createdAt: iso(createdAt),
+      inactiveAt: deck.inactiveAt ? iso(deck.inactiveAt) : null,
+      allowed: deck.inactiveAt == null,
     };
   };
 
@@ -211,6 +235,8 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
     name: deck.name,
     cardCount: counts.get(deck.id) ?? 0,
     createdAt: iso(deck.createdAt),
+    inactiveAt: deck.inactiveAt ? iso(deck.inactiveAt) : null,
+    allowed: deck.inactiveAt == null,
   }));
 
   const invitedWorkspaces: AdminInvitedWorkspaceRecord[] = memberships.map((membership) => ({
@@ -218,6 +244,7 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
     name: membership.teamName,
     role: roleLabel(membership.role),
     joinedAt: iso(membership.joinedAt),
+    allowed: membership.memberInactiveAt == null && membership.teamInactiveAt == null,
     assignedDecks: assignmentRows
       .filter((row) => row.teamId === membership.teamId && row.memberUserId === userId)
       .map((row) => toDeck(row.deckId, row.assignedAt))
@@ -239,6 +266,8 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
       teamId: team.id,
       name: team.name,
       createdAt: iso(team.createdAt),
+      inactiveAt: team.inactiveAt ? iso(team.inactiveAt) : null,
+      allowed: false,
       deckLimit: planLimit,
       members: memberRows
         .filter((member) => member.teamId === team.id)
@@ -247,6 +276,8 @@ export async function getAdminUserRecords(userId: string): Promise<AdminUserReco
           role: roleLabel(member.role),
           deckLimit: member.role === "team_admin" ? (member.maxCreateDecks ?? planLimit) : null,
           joinedAt: iso(member.joinedAt),
+          inactiveAt: member.inactiveAt ? iso(member.inactiveAt) : null,
+          allowed: false,
         })),
       linkedDecks: [...linked.entries()]
         .map(([deckId, createdAt]) => toDeck(deckId, createdAt))
