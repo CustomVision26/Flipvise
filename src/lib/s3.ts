@@ -195,6 +195,20 @@ export interface UploadDocumentationAgentImageOptions {
   file: File;
 }
 
+export async function uploadAboutLeaderPhotoToS3(options: {
+  userId: string;
+  file: File;
+}): Promise<string> {
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const extension = options.file.name.includes(".")
+    ? options.file.name.substring(options.file.name.lastIndexOf(".")).toLowerCase()
+    : "";
+  const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(extension) ? extension : ".img";
+  const key = `about-leaders/${options.userId}/leader-${timestamp}-${randomString}${safeExt}`;
+  return uploadImageFileToS3({ key, file: options.file });
+}
+
 export async function uploadDocumentationAgentImageToS3(
   options: UploadDocumentationAgentImageOptions,
 ): Promise<string> {

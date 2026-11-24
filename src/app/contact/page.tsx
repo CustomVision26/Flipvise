@@ -11,11 +11,16 @@ export const metadata: Metadata = {
     "Contact Flipvise support by email, phone, or message — or use the in-app Help Center for tickets.",
 };
 
-export default async function ContactPage() {
-  const [{ homeHref, isSignedIn }, settings, sessionUser] = await Promise.all([
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ subject?: string }>;
+}) {
+  const [{ homeHref, isSignedIn }, settings, sessionUser, params] = await Promise.all([
     resolvePublicPageHomeContext(),
     getPlatformContactSettings(),
     currentUser(),
+    searchParams,
   ]);
 
   const defaultName =
@@ -34,6 +39,7 @@ export default async function ContactPage() {
         companyAddress={settings.companyAddress ?? null}
         defaultName={defaultName}
         defaultEmail={defaultEmail}
+        defaultSubject={typeof params.subject === "string" ? params.subject.slice(0, 200) : ""}
       />
     </PublicMarketingPageChrome>
   );

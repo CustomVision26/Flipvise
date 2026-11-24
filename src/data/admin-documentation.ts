@@ -229,6 +229,30 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not turn this on in production until the illustrated screens have been reviewed.",
         ],
       },
+      {
+        id: "admin-about-us",
+        title: "About Us",
+        route: "/admin/about",
+        purpose: "Edit and publish the public About Us page.",
+        howItWorks: [
+          "Website content in the admin sidebar opens /admin/about.",
+          "Save draft stores unpublished copy. Preview draft opens /about?preview=draft for platform administrators only.",
+          "Publish replaces the public page. Visitors never receive the draft.",
+          "Leadership photographs accept JPEG, PNG, or WebP files up to 2 MB. Initials remain until a photograph is uploaded.",
+          "Feature visibility can be Available, Premium Feature, Team Feature, Add-on, Coming Soon, or Hidden. Hidden items are omitted from the public page.",
+          "Release notes stay empty until an approved note is published. The running web, Android, and iOS version numbers are read from the build and are not edited here.",
+          "Each save, publish, and photograph upload writes an audit row with the administrator and the time.",
+        ],
+        requirements: [
+          "Platform admin or superadmin access.",
+          "Migration drizzle/0082_platform_about_settings.sql applied, or npm run db:ensure-platform-about-settings.",
+        ],
+        doNots: [
+          "Do not give team administrators access to this page.",
+          "Do not type a version number here and expect it to replace the build version.",
+          "Do not publish a Coming Soon label unless that announcement is approved.",
+        ],
+      },
     ],
   },
   {

@@ -3,6 +3,7 @@ import {
   BookOpen,
   BrainCircuit,
   Building2,
+  Info,
   LayoutList,
   LifeBuoy,
   Megaphone,
@@ -128,6 +129,18 @@ export const ADMIN_DASHBOARD_NAV: AdminNavSection[] = [
         path: "/admin/add-ons",
         icon: Puzzle,
         isActive: (pathname) => pathMatches(pathname, "/admin/add-ons"),
+      },
+    ],
+  },
+  {
+    title: "Website content",
+    description: "Public pages managed by platform administrators.",
+    items: [
+      {
+        title: "About Us",
+        path: "/admin/about",
+        icon: Info,
+        isActive: (pathname) => pathname === "/admin/about",
       },
     ],
   },

@@ -1,4 +1,5 @@
 import type { InferSelectModel } from 'drizzle-orm';
+import type { AboutPageContent } from '@/lib/about-page-content';
 import {
   boolean,
   integer,
@@ -2384,6 +2385,28 @@ export const platformAppearanceAuditLogs = pgTable(
   (t) => [
     index('platform_appearance_audit_logs_created_idx').on(t.createdAt),
   ],
+);
+
+/** Singleton (id = 1) — draft and published About Us page content. */
+export const platformAboutSettings = pgTable('platform_about_settings', {
+  id: integer().primaryKey().default(1),
+  draft: json().$type<AboutPageContent>(),
+  published: json().$type<AboutPageContent>(),
+  updatedAt: timestamp().notNull().defaultNow(),
+  publishedAt: timestamp(),
+  updatedByUserId: varchar({ length: 255 }),
+});
+
+/** Audit trail for About Us content saves, publishes, and photo uploads. */
+export const platformAboutAuditLogs = pgTable(
+  'platform_about_audit_logs',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    adminUserId: varchar({ length: 255 }).notNull(),
+    action: varchar({ length: 64 }).notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [index('platform_about_audit_logs_created_idx').on(t.createdAt)],
 );
 
 /** Row shapes for client `import type` — avoids bundling table refs into client runtime chunks. */

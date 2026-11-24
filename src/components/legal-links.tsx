@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const LEGAL_LINKS = [
+  { href: "/about", label: "About Us" },
   { href: "/privacy", label: "Privacy Policy" },
   { href: "/terms", label: "Terms of Service" },
   { href: "/ai", label: "AI data handling" },
@@ -12,7 +13,7 @@ const LEGAL_LINKS = [
 export function LegalLinks({ className }: { className?: string }) {
   return (
     <nav
-      aria-label="Privacy, terms, documentation, and contact"
+      aria-label="About, privacy, terms, documentation, and contact"
       className={cn(
         "flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground",
         className,

@@ -956,6 +956,33 @@ const ALL_ARTICLES: DocArticle[] = [
       },
     ],
   ),
+  a(
+    "admin-about-us",
+    "About Us — In-Depth Guide",
+    "Platform administrators edit the public About Us page at /admin/about.",
+    [
+      {
+        id: "publish",
+        title: "Draft and publish",
+        bullets: [
+          "Save draft keeps changes off the public page.",
+          "Preview draft is limited to platform administrators.",
+          "Publish is what visitors see at /about.",
+          "Restore defaults reloads the built-in copy in the editor. It is not public until you publish it.",
+        ],
+      },
+      {
+        id: "limits",
+        title: "What stays outside the editor",
+        bullets: [
+          "Web, Android, and iOS version numbers come from the project build files.",
+          "Photographs must be JPEG, PNG, or WebP and 2 MB or smaller.",
+          "Contact links must be paths inside Flipvise, such as /contact.",
+          "Hidden features are not shown publicly. Coming Soon is a deliberate visibility choice.",
+        ],
+      },
+    ],
+  ),
 ];
 
 export const ADMIN_DOCUMENTATION_ARTICLES_BY_PAGE_ID: Readonly<Record<string, DocArticle>> =

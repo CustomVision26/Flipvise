@@ -5,6 +5,7 @@ import { DECKS_STUDY_ARTICLES } from "@/data/user-documentation-articles/decks-s
 import { INBOX_ARTICLES } from "@/data/user-documentation-articles/inbox";
 import { HELP_CENTER_ARTICLES } from "@/data/user-documentation-articles/help-center";
 import { CONTACT_US_ARTICLES } from "@/data/user-documentation-articles/contact-us";
+import { ABOUT_ARTICLES } from "@/data/user-documentation-articles/about";
 import { PRICING_BILLING_ARTICLES } from "@/data/user-documentation-articles/pricing-billing";
 import { ACCOUNT_CLERK_ARTICLES } from "@/data/user-documentation-articles/account-clerk";
 import { TEAM_ADMIN_ARTICLES } from "@/data/user-documentation-articles/team-admin";
@@ -20,6 +21,7 @@ const ALL_ARTICLES: DocArticle[] = [
   ...INBOX_ARTICLES,
   ...HELP_CENTER_ARTICLES,
   ...CONTACT_US_ARTICLES,
+  ...ABOUT_ARTICLES,
   ...PRICING_BILLING_ARTICLES,
   ...ACCOUNT_CLERK_ARTICLES,
   ...TEAM_ADMIN_ARTICLES,

@@ -17,7 +17,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Use Sign In to open the Clerk authentication modal. Sign up from that modal uses the Flipvise account form (not Clerk’s hosted Sign Up).",
           "Use Sign Up, the purple button, to open the Flipvise account form (name, email, password, and password confirmation). That dialog uses rounded fields, a purple Continue button, and a small owl illustration, and stays readable in light and dark theme. The email-code step shows an owl with an envelope, six separate code boxes, and the same purple Continue button. Sign In is the outlined button beside it. The hero panel is half see-through so the woodland artwork shows behind it. The Flipvise logo uses the full-resolution studio artwork at its real aspect ratio, so the gold border and lettering stay sharp. Feature cards use cartoon artwork for AI generation, smart study, and team learning, and the panel, cards, and footer stay readable in light and dark theme. Creating an account agrees to the Terms of Service and Privacy Policy, linked under the button.",
-          "The page footer shows the Flipvise Studio support email, phone, WhatsApp number, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
+          "The page footer shows the Flipvise Studio support email, phone, WhatsApp number, and company address, and links to About Us, the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
           "After you sign in, you are redirected to your personal dashboard. If required account details are incomplete, you complete them on the account-information form before the dashboard becomes available. That form uses purple step tabs, rounded fields, and an owl illustration, and stays readable in light and dark theme.",
           "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse — including Create a deck, deck editor card walkthroughs, and Education Teacher guides under Team Tier Plan (AI Lesson Builder for the plan owner, AI Lesson Builder for a new deck, AI Quiz/Test Generator from a lesson plan, and AI Quiz/Test Generator for an existing deck, Homework Generator from a deck, Homework Generator from a lesson plan, Study Guide Generator from a lesson plan, Worksheet Generator from a lesson plan, Classes for the plan owner, Student Progress for the plan owner, Register a student for the plan owner, Student quiz results for the plan owner, Manual assignment grades for the plan owner, Quiz grades for the plan owner, and Teacher Resource Library for the plan owner). The catalog window is a solid illustrated panel with a reading owl, colored guide icons, and step counts, and it stays readable in light and dark. A search field matches a question, such as how to add a new deck, to the guide that explains that task. Each documentation article, in-depth guide, and the View screenshot window is a solid illustrated panel with a reading owl, purple controls, and gold and red callouts, readable in light and dark.",
@@ -32,7 +32,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         id: "header-navigation",
         title: "Top Navigation Bar",
         purpose:
-          "Quick links to Home, Documentation, Plans, UI Guides, and Contact Support from anywhere in the app.",
+          "Quick links to Home, Documentation, Plans, About Us, UI Guides, and Contact Support from anywhere in the app.",
         howItWorks: [
           "Home returns to your dashboard when signed in, or the homepage when signed out.",
           "Documentation opens this guide.",
@@ -40,7 +40,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Contact Us appears in the top nav for guests only — it opens the public Contact Support page with live chat.",
           "Signed-in users open Documentation from the book icon beside Help and the bell (right side of the header). Plans is an outline pill, and the plan name is a gold badge with a crown.",
           "UI Guides in the header opens a catalog grouped as Getting started, Decks and cards, and Team Tier Plan. Education Teacher is nested under Team Tier Plan and includes Teacher Dashboard, AI Lesson Builder for the plan owner, AI Lesson Builder for a new deck, AI Quiz/Test Generator from a lesson plan, and AI Quiz/Test Generator for an existing deck, Homework Generator from a deck, Homework Generator from a lesson plan, Study Guide Generator from a lesson plan, Worksheet Generator from a lesson plan, Classes for the plan owner, Student Progress for the plan owner, Register a student for the plan owner, Student quiz results for the plan owner, Manual assignment grades for the plan owner, Quiz grades for the plan owner, and Teacher Resource Library for the plan owner. Guests see it in the top nav; signed-in users see it beside Inbox.",
-          "Guest homepage nav shows Plans and Contact Us; on Documentation or Contact Us you also see Home and Documentation.",
+          "Guest homepage nav shows About, Plans, and Contact Us; on Documentation or Contact Us you also see Home and Documentation.",
           "Signed-in users also see a gold plan badge, a blue account button, workspace switcher, bell, UI Guides, and account menu. The workspace menu is a searchable list with Personal Dash and invited workspaces, each with its own artwork, and stays readable in light and dark. The plan name opens the same Manage account window on Billing, with Account details, Appearance, and Billing filled in. Clicking the photograph in the account menu opens a formal portrait dialog. Hover the plan name to confirm grant access is not a paid subscription. Platform admins also see a Platform Admin button in the account menu.",
           "Personal Dash is /dashboard; invited workspaces use /dashboard?team=<id> — Clerk user ids are not placed in the address bar.",
         ],
@@ -496,6 +496,35 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
     ],
   },
   {
+    id: "about",
+    title: "About Flipvise",
+    description: "Public company page for guests and signed-in users.",
+    pages: [
+      {
+        id: "about-us",
+        title: "About Us",
+        route: "/about",
+        purpose:
+          "Public page for the company identity, leadership, learning tools, and the current application version.",
+        howItWorks: [
+          "Open /about without signing in. The same page stays available after sign-in.",
+          "The footer on every page links to About Us, and the guest header includes About.",
+          "Signed-in users can also open About Flipvise from the Help Center.",
+          "Explore Flipvise opens Documentation, View Plans opens Pricing, and Contact Us opens the contact form.",
+          "Leadership cards show initials until a platform administrator uploads a photograph.",
+          "Version numbers are read from the web package, the Android project, and the iOS project. Web, Android, and iOS can differ.",
+          "What's New stays empty until a platform administrator publishes a release note.",
+          "Get Started returns to the homepage for guests and to the dashboard for signed-in users.",
+        ],
+        requirements: ["None — guests and signed-in users can open /about."],
+        doNots: [
+          "Do not expect a public app-store button until a store URL is configured for that platform.",
+          "Do not treat AI-generated content described on the page as guaranteed to be accurate.",
+        ],
+      },
+    ],
+  },
+  {
     id: "contact-us",
     title: "Contact Us",
     description:
@@ -615,7 +644,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Compare tiers, choose monthly or yearly billing, and start checkout.",
         howItWorks: [
-          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck, Subscribe, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. That catalog is a solid illustrated window with a reading owl and colored guide icons. A search field matches a question, such as how to add a new deck, to the guide that explains that task. The page footer shows the Flipvise Studio support email, phone, WhatsApp number, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us. The pricing header shows books and an owl, purple plan buttons, and solid cards that stay readable in light and dark. The pricing documentation article is a solid illustrated panel with a reading owl.",
+          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck, Subscribe, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. That catalog is a solid illustrated window with a reading owl and colored guide icons. A search field matches a question, such as how to add a new deck, to the guide that explains that task. The page footer shows the Flipvise Studio support email, phone, WhatsApp number, and company address, and links to About Us, the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us. The pricing header shows books and an owl, purple plan buttons, and solid cards that stay readable in light and dark. The pricing documentation article is a solid illustrated panel with a reading owl.",
           "Toggle Billing period between monthly and yearly (yearly shows an effective monthly rate).",
           "Filter plans with the View plans dropdown, or show all tiers in the grid.",
           "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, and Enterprise.",

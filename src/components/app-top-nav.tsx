@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, CreditCard, Home, Mail } from "lucide-react";
+import { BookOpen, CreditCard, Home, Info, Mail } from "lucide-react";
 import { HeaderNavTooltip } from "@/components/header-nav-tooltip";
 import { DocsUiGuidesMenuButton } from "@/components/docs-ui-guide-provider";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ export function AppTopNav({
   const isDocs = pathname === "/docs" || pathname.startsWith("/docs/");
   const isContact = pathname === "/contact" || pathname.startsWith("/contact/");
   const isPricing = pathname === "/pricing" || pathname.startsWith("/pricing/");
+  const isAbout = pathname === "/about";
   const isHome =
     pathname === "/" ||
     pathname === homeHref ||
@@ -65,6 +66,18 @@ export function AppTopNav({
       icon: CreditCard,
       active: isPricing,
     },
+    ...(!signedIn
+      ? [
+          {
+            href: "/about",
+            label: "About",
+            shortLabel: "About",
+            tooltip: "About Us",
+            icon: Info,
+            active: isAbout,
+          },
+        ]
+      : []),
   ] as const;
 
   return (

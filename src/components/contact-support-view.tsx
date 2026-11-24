@@ -64,6 +64,7 @@ type ContactSupportViewProps = {
   companyAddress: PlatformCompanyAddress | null;
   defaultName?: string;
   defaultEmail?: string;
+  defaultSubject?: string;
 };
 
 export function ContactSupportView({
@@ -74,6 +75,7 @@ export function ContactSupportView({
   companyAddress,
   defaultName,
   defaultEmail,
+  defaultSubject,
 }: ContactSupportViewProps) {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-10">
@@ -102,7 +104,11 @@ export function ContactSupportView({
             </div>
           </CardHeader>
           <CardContent className="pt-5">
-            <ContactSupportForm defaultName={defaultName} defaultEmail={defaultEmail} />
+            <ContactSupportForm
+              defaultName={defaultName}
+              defaultEmail={defaultEmail}
+              defaultSubject={defaultSubject}
+            />
             <Link
               href="/docs#contact-us-live-chat"
               className={buttonVariants({

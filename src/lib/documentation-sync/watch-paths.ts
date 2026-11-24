@@ -191,6 +191,13 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "help-center-account": ["src/components/help-center.tsx"],
   "help-center-my-tickets": ["src/components/help-center-my-tickets.tsx"],
   "help-center-priority-support": ["src/components/help-center.tsx"],
+  "about-us": [
+    "src/app/about/page.tsx",
+    "src/components/about-page-view.tsx",
+    "src/components/about-page-interactive.tsx",
+    "src/lib/about-page-content.ts",
+    "src/lib/app-release-metadata.ts",
+  ],
   "contact-us-page": [
     "src/components/contact-support-view.tsx",
     "src/components/contact-support-form.tsx",
@@ -433,6 +440,12 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
 };
 
 export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly string[]>> = {
+  "admin-about-us": [
+    "src/components/admin-about-editor.tsx",
+    "src/actions/about-page.ts",
+    "src/db/queries/about-page.ts",
+    "src/lib/about-page-content.ts",
+  ],
   "admin-dashboard-overview": [
     "src/components/admin-overview-stats-collapsible.tsx",
     "src/lib/admin/load-admin-dashboard-data.ts",

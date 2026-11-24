@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState, useTransition, useRef, useCallback, useEffect } from "react";
 import { HELP_CENTER_OPEN_EVENT } from "@/lib/help-center-open";
 import {
   HelpCircle,
+  Info,
   MessageSquare,
   Bug,
   Lightbulb,
@@ -836,6 +838,21 @@ function HelpLanding({
           </button>
         );
       })}
+      <Link
+        href="/about"
+        className="help-row flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors"
+      >
+        <span className="help-icon help-icon-account">
+          <Info className="h-5 w-5" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium leading-none">About Flipvise</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Company, leadership, and the current application version
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      </Link>
     </div>
   );
 }

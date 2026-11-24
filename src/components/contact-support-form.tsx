@@ -14,17 +14,19 @@ import { Textarea } from "@/components/ui/textarea";
 type ContactSupportFormProps = {
   defaultName?: string;
   defaultEmail?: string;
+  defaultSubject?: string;
 };
 
 export function ContactSupportForm({
   defaultName = "",
   defaultEmail = "",
+  defaultSubject = "",
 }: ContactSupportFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [name, setName] = useState(defaultName);
   const [email, setEmail] = useState(defaultEmail);
-  const [subject, setSubject] = useState("");
+  const [subject, setSubject] = useState(defaultSubject);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [threadHref, setThreadHref] = useState<string | null>(null);

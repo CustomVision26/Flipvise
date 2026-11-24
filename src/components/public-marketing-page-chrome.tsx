@@ -11,15 +11,18 @@ type PublicMarketingPageChromeProps = {
   homeHref: string;
   isSignedIn: boolean;
   children: React.ReactNode;
+  /** When true, the page follows the visitor's light or dark theme. */
+  followTheme?: boolean;
 };
 
 export function PublicMarketingPageChrome({
   homeHref,
   isSignedIn,
   children,
+  followTheme = false,
 }: PublicMarketingPageChromeProps) {
   return (
-    <div className="dark relative min-h-full w-full">
+    <div className={cn(!followTheme && "dark", "relative min-h-full w-full")}>
       <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-cyan-950/20 via-background to-background">
         <PublicPageAtmosphere />
         <header className="relative z-10 border-b border-cyan-400/20 bg-card/30 shadow-[0_8px_40px] shadow-cyan-500/5 backdrop-blur-md">
