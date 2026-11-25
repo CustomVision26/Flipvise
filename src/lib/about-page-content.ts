@@ -31,6 +31,7 @@ export type AboutLeader = {
   linkedInUrl: string;
   contactUrl: string;
   photoUrl: string;
+  published: boolean;
 };
 
 export type AboutFeature = {
@@ -163,6 +164,18 @@ const idSchema = z
   .max(64)
   .regex(/^[a-z0-9-]+$/, "Ids use lowercase letters, numbers, and hyphens.");
 
+export const aboutLeaderSchema = z.object({
+  id: idSchema,
+  name: text(120),
+  position: text(80),
+  bio: text(2000),
+  initials: z.string().trim().min(1).max(4),
+  linkedInUrl: optionalLinkedIn,
+  contactUrl: optionalHttps,
+  photoUrl: optionalPhoto,
+  published: z.boolean().default(true),
+});
+
 const releaseDate = z
   .string()
   .trim()
@@ -190,21 +203,7 @@ export const aboutPageContentSchema = z.object({
     .max(12),
   storyHeading: text(120),
   storyParagraphs: z.array(text(1200)).min(1).max(8),
-  leaders: z
-    .array(
-      z.object({
-        id: idSchema,
-        name: text(120),
-        position: text(80),
-        bio: text(2000),
-        initials: z.string().trim().min(1).max(4),
-        linkedInUrl: optionalLinkedIn,
-        contactUrl: optionalHttps,
-        photoUrl: optionalPhoto,
-      }),
-    )
-    .min(1)
-    .max(12),
+  leaders: z.array(aboutLeaderSchema).max(12),
   featuresHeading: text(160),
   featuresDescription: text(800),
   features: z
@@ -336,6 +335,7 @@ const DEFAULT_ABOUT_PAGE_CONTENT: AboutPageContent = {
       linkedInUrl: "",
       contactUrl: "",
       photoUrl: "",
+      published: true,
     },
     {
       id: "jason-pottinger",
@@ -346,6 +346,7 @@ const DEFAULT_ABOUT_PAGE_CONTENT: AboutPageContent = {
       linkedInUrl: "",
       contactUrl: "",
       photoUrl: "",
+      published: true,
     },
     {
       id: "jermaine-francis",
@@ -356,6 +357,7 @@ const DEFAULT_ABOUT_PAGE_CONTENT: AboutPageContent = {
       linkedInUrl: "",
       contactUrl: "",
       photoUrl: "",
+      published: true,
     },
   ],
   featuresHeading: "Technology That Supports Every Learning Journey",
@@ -660,6 +662,36 @@ export function parseAboutPageContent(
     return { ok: false, error: `${path}: ${issue?.message ?? "Invalid About Us content."}` };
   }
   return { ok: true, content: parsed.data };
+}
+
+export function parseAboutLeader(
+  input: unknown,
+): { ok: true; leader: AboutLeader } | { ok: false; error: string } {
+  const parsed = aboutLeaderSchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return { ok: false, error: issue?.message ?? "This leader record is incomplete." };
+  }
+  return { ok: true, leader: parsed.data };
+}
+
+export function blankAboutLeader(): AboutLeader {
+  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  return {
+    id: `leader-${suffix}`,
+    name: "",
+    position: "",
+    bio: "",
+    initials: "",
+    linkedInUrl: "",
+    contactUrl: "",
+    photoUrl: "",
+    published: false,
+  };
+}
+
+export function publicAboutLeaders(content: AboutPageContent): AboutLeader[] {
+  return content.leaders.filter((leader) => leader.published);
 }
 
 export function publicAboutFeatures(content: AboutPageContent): AboutFeature[] {

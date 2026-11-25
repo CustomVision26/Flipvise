@@ -4,12 +4,18 @@ import { createClerkClient } from "@clerk/backend";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
+  applyAboutLeaderChange,
   getAboutAdminState,
   publishAboutContent,
   recordAboutPhotoUpload,
   saveAboutDraft,
 } from "@/db/queries/about-page";
-import { parseAboutPageContent, type AboutPageContent } from "@/lib/about-page-content";
+import {
+  parseAboutLeader,
+  parseAboutPageContent,
+  type AboutLeader,
+  type AboutPageContent,
+} from "@/lib/about-page-content";
 import { isClerkPlatformAdminRole, isClerkSuperadminRole } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { uploadAboutLeaderPhotoToS3 } from "@/lib/s3";
@@ -66,6 +72,45 @@ export async function publishAboutContentAction(input: AboutPageContent) {
     await publishAboutContent(userId, parsed.content);
   } catch (error) {
     console.error("[publishAboutContentAction]", error);
+    return {
+      ok: false as const,
+      message: "The About Us tables are not ready. Run npm run db:ensure-platform-about-settings.",
+    };
+  }
+  revalidatePath("/about");
+  revalidatePath("/admin/about");
+  return { ok: true as const };
+}
+
+export async function setAboutLeaderPublishedAction(leader: AboutLeader) {
+  const userId = await requirePlatformAdmin();
+  const parsed = parseAboutLeader(leader);
+  if (!parsed.ok) return { ok: false as const, message: parsed.error };
+  try {
+    const result = await applyAboutLeaderChange(userId, { type: "upsert", leader: parsed.leader });
+    if (!result.ok) return result;
+  } catch (error) {
+    console.error("[setAboutLeaderPublishedAction]", error);
+    return {
+      ok: false as const,
+      message: "The About Us tables are not ready. Run npm run db:ensure-platform-about-settings.",
+    };
+  }
+  revalidatePath("/about");
+  revalidatePath("/admin/about");
+  return { ok: true as const };
+}
+
+export async function deleteAboutLeaderAction(leaderId: string) {
+  const userId = await requirePlatformAdmin();
+  if (!/^[a-z0-9-]{1,64}$/.test(leaderId)) {
+    return { ok: false as const, message: "Unknown leader." };
+  }
+  try {
+    const result = await applyAboutLeaderChange(userId, { type: "remove", leaderId });
+    if (!result.ok) return result;
+  } catch (error) {
+    console.error("[deleteAboutLeaderAction]", error);
     return {
       ok: false as const,
       message: "The About Us tables are not ready. Run npm run db:ensure-platform-about-settings.",

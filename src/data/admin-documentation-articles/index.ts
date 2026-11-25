@@ -968,6 +968,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Save draft keeps changes off the public page.",
           "Preview draft is limited to platform administrators.",
           "Publish is what visitors see at /about.",
+          "Each leader has Edit, Delete, and Publish. Only a published leader appears on the public page.",
           "Restore defaults reloads the built-in copy in the editor. It is not public until you publish it.",
         ],
       },

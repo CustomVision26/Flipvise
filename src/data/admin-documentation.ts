@@ -238,6 +238,8 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Website content in the admin sidebar opens /admin/about.",
           "Save draft stores unpublished copy. Preview draft opens /about?preview=draft for platform administrators only.",
           "Publish replaces the public page. Visitors never receive the draft.",
+          "Leaders are listed in a table. New record opens a blank form, and Edit opens that person's form.",
+          "Publish on a leader row places that person on the public About Us page. Delete removes the record from the editor and the public page.",
           "Leadership photographs accept JPEG, PNG, or WebP files up to 2 MB. Initials remain until a photograph is uploaded.",
           "Feature visibility can be Available, Premium Feature, Team Feature, Add-on, Coming Soon, or Hidden. Hidden items are omitted from the public page.",
           "Release notes stay empty until an approved note is published. The running web, Android, and iOS version numbers are read from the build and are not edited here.",

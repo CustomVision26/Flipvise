@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-11-24T00:12:39.478Z",
+  "updatedAt": "2026-11-24T01:17:08.280Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "6de414f5a10b5d38f96ec51b8ea35e21076a6453b605a7fb8796be5a0e395d32",
@@ -79,8 +79,8 @@
       "docFingerprint": "09bb3a1af8491ede4dcda8e38f645b88c2558141b8a79a6fe7108096d92d4629"
     },
     "about-us": {
-      "watchFingerprint": "9d9a2b89ab06cbfcd085b00b4741a19f5dba68d11cac047994abe15cd9775806",
-      "docFingerprint": "f5308608cb5f15f30e9584865f86f065c8163b8c05f12204ac3da871d0cf2d4d"
+      "watchFingerprint": "692644b9a987b8cfe62e0e6abe713c23fc25cced1b77a18b6e6085e8f7d950a0",
+      "docFingerprint": "7d8c80d3dd15c91930b22a1fca1781b62bf705f1f2c61578b2a6a3dbd8e86350"
     },
     "contact-us-page": {
       "watchFingerprint": "36d41aca24d871919d2b9d99bb5d2ae74204ec4f031c4f1e0fdef019917acaed",
@@ -275,8 +275,8 @@
       "docFingerprint": "88cd628ac22948dbd876f18aa62f88c4e0faa1858f6816850787b2247982c6e2"
     },
     "admin-about-us": {
-      "watchFingerprint": "9114ad384e46cd4d55d8b42c314e62443b36f3b88eee18658b63741963ddcaa9",
-      "docFingerprint": "853cbe303566c69397849afbd0293cd38df863b1d46397da6f72f34fd1498ba0"
+      "watchFingerprint": "008764d5285d6176a02e322d567a6f6ce9b0c2df0411158eaced6bf5f78e161c",
+      "docFingerprint": "18874004fcfde9bd3cc3b027df6f011da3bce7d52421400f295c63bd63f62628"
     },
     "support-tickets": {
       "watchFingerprint": "ba3eabd3addaeb906ad2d28d33984f79320c4c61fac3f6be08cbe1ec4ba42219",

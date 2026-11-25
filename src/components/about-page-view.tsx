@@ -25,6 +25,7 @@ import { LOGO_PUBLIC_URL } from "@/lib/branding";
 import {
   ABOUT_FEATURE_LABELS,
   publicAboutFeatures,
+  publicAboutLeaders,
   publishedReleaseNotes,
   type AboutPageContent,
 } from "@/lib/about-page-content";
@@ -100,6 +101,7 @@ export function AboutPageView({
   previewing: boolean;
 }) {
   const features = publicAboutFeatures(content);
+  const leaders = publicAboutLeaders(content);
   const notes = publishedReleaseNotes(content);
 
   return (
@@ -207,13 +209,14 @@ export function AboutPageView({
         ))}
       </section>
 
+      {leaders.length > 0 ? (
       <section className="flex flex-col gap-6">
         <SectionHeading
           title="Meet Our Leadership Team"
           description="Behind Flipvise is a leadership team focused on innovation, technology, operational development and the continuous improvement of the educational experience."
         />
         <div className="grid gap-4 md:grid-cols-3">
-          {content.leaders.map((leader) => (
+          {leaders.map((leader) => (
             <Card key={leader.id} className="bg-card text-card-foreground">
               <CardHeader className="items-center text-center">
                 {leader.photoUrl ? (
@@ -264,6 +267,7 @@ export function AboutPageView({
           ))}
         </div>
       </section>
+      ) : null}
 
       <section className="flex flex-col gap-6">
         <SectionHeading title={content.featuresHeading} description={content.featuresDescription} />

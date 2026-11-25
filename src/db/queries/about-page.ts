@@ -4,6 +4,7 @@ import { platformAboutAuditLogs, platformAboutSettings } from "@/db/schema";
 import {
   defaultAboutPageContent,
   parseAboutPageContent,
+  type AboutLeader,
   type AboutPageContent,
 } from "@/lib/about-page-content";
 
@@ -135,6 +136,73 @@ export async function publishAboutContent(userId: string, content: AboutPageCont
     adminUserId: userId,
     action: "about_published",
   });
+}
+
+function withLeaders(content: AboutPageContent, leaders: AboutLeader[]): AboutPageContent {
+  return { ...content, leaders };
+}
+
+function upsertLeader(leaders: AboutLeader[], leader: AboutLeader): AboutLeader[] {
+  const index = leaders.findIndex((item) => item.id === leader.id);
+  if (index === -1) return [...leaders, leader];
+  const next = leaders.slice();
+  next[index] = leader;
+  return next;
+}
+
+export async function applyAboutLeaderChange(
+  userId: string,
+  change: { type: "upsert"; leader: AboutLeader } | { type: "remove"; leaderId: string },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const [row] = await db
+    .select()
+    .from(platformAboutSettings)
+    .where(eq(platformAboutSettings.id, 1))
+    .limit(1);
+  const draftBase =
+    contentOrDefault(row?.draft) ?? contentOrDefault(row?.published) ?? defaultAboutPageContent();
+  const publishedBase = contentOrDefault(row?.published) ?? defaultAboutPageContent();
+  const nextLeaders = (leaders: AboutLeader[]) =>
+    change.type === "remove"
+      ? leaders.filter((leader) => leader.id !== change.leaderId)
+      : upsertLeader(leaders, change.leader);
+  const draftParsed = parseAboutPageContent(withLeaders(draftBase, nextLeaders(draftBase.leaders)));
+  const publishedParsed = parseAboutPageContent(
+    withLeaders(publishedBase, nextLeaders(publishedBase.leaders)),
+  );
+  if (!draftParsed.ok || !publishedParsed.ok) {
+    return {
+      ok: false,
+      message: draftParsed.ok ? publishedParsed.error : draftParsed.error,
+    };
+  }
+  const now = new Date();
+  const action = change.type === "remove" ? "about_leader_deleted" : "about_leader_published";
+  await db
+    .insert(platformAboutSettings)
+    .values({
+      id: 1,
+      draft: draftParsed.content,
+      published: publishedParsed.content,
+      updatedAt: now,
+      publishedAt: now,
+      updatedByUserId: userId,
+    })
+    .onConflictDoUpdate({
+      target: platformAboutSettings.id,
+      set: {
+        draft: draftParsed.content,
+        published: publishedParsed.content,
+        updatedAt: now,
+        publishedAt: now,
+        updatedByUserId: userId,
+      },
+    });
+  await db.insert(platformAboutAuditLogs).values({
+    adminUserId: userId,
+    action,
+  });
+  return { ok: true };
 }
 
 export async function recordAboutPhotoUpload(userId: string) {

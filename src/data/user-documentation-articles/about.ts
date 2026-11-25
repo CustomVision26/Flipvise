@@ -12,6 +12,7 @@ export const ABOUT_ARTICLES: DocArticle[] = [
         title: "Opening the page",
         bullets: [
           "Guests and signed-in users can open /about.",
+          "Leadership cards include only people a platform administrator has published.",
           "The footer links to About Us on every page.",
           "The guest header includes About. Signed-in users can open it from Help Center.",
         ],

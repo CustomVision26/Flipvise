@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type TransitionStartFunction } from "react";
 import Link from "next/link";
 import {
+  deleteAboutLeaderAction,
   publishAboutContentAction,
   saveAboutDraftAction,
+  setAboutLeaderPublishedAction,
   uploadAboutLeaderPhotoAction,
 } from "@/actions/about-page";
 import { Button } from "@/components/ui/button";
@@ -18,12 +20,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ABOUT_FEATURE_AVAILABILITY,
   ABOUT_FEATURE_LABELS,
+  blankAboutLeader,
   defaultAboutPageContent,
+  parseAboutLeader,
   type AboutFeatureAvailability,
+  type AboutLeader,
   type AboutPageContent,
   type AboutReleaseNote,
 } from "@/lib/about-page-content";
@@ -224,52 +237,15 @@ export function AdminAboutEditor({
         </TabsContent>
 
         <TabsContent value="leaders" className="flex flex-col gap-4 pt-4">
-          {content.leaders.map((leader, index) => (
-            <div key={leader.id} className="flex flex-col gap-2 rounded-lg border border-border p-3">
-              <div className="flex gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => patch({ leaders: moveItem(content.leaders, index, -1) })}>
-                  Up
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => patch({ leaders: moveItem(content.leaders, index, 1) })}>
-                  Down
-                </Button>
-              </div>
-              <Field label="Name" value={leader.name} onChange={(name) => updateLeader(content, index, { name }, patch)} />
-              <Field label="Position" value={leader.position} onChange={(position) => updateLeader(content, index, { position }, patch)} />
-              <Field label="Initials" value={leader.initials} onChange={(initials) => updateLeader(content, index, { initials }, patch)} />
-              <Field label="Biography" value={leader.bio} multiline onChange={(bio) => updateLeader(content, index, { bio }, patch)} />
-              <Field label="LinkedIn URL" value={leader.linkedInUrl} onChange={(linkedInUrl) => updateLeader(content, index, { linkedInUrl }, patch)} />
-              <Field label="Contact URL" value={leader.contactUrl} onChange={(contactUrl) => updateLeader(content, index, { contactUrl }, patch)} />
-              <p className="text-xs text-muted-foreground">
-                {leader.photoUrl ? "Photograph uploaded." : "No photograph. Initials are shown."}
-              </p>
-              <Input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  const formData = new FormData();
-                  formData.set("file", file);
-                  startTransition(async () => {
-                    const result = await uploadAboutLeaderPhotoAction(formData);
-                    if (!result.ok) {
-                      setError(result.message);
-                      return;
-                    }
-                    setContent((current) => {
-                      const leaders = current.leaders.slice();
-                      const leader = leaders[index];
-                      if (!leader) return current;
-                      leaders[index] = { ...leader, photoUrl: result.url };
-                      return { ...current, leaders };
-                    });
-                    setMessage("Photograph uploaded. Publish to show it on the public page.");
-                  });
-                }}
-              />
-            </div>
-          ))}
+          <LeaderRecords
+            leaders={content.leaders}
+            tableReady={tableReady}
+            pending={pending}
+            startTransition={startTransition}
+            onLeaders={(leaders) => patch({ leaders })}
+            onError={setError}
+            onMessage={setMessage}
+          />
         </TabsContent>
 
         <TabsContent value="features" className="flex flex-col gap-4 pt-4">
@@ -480,17 +456,235 @@ export function AdminAboutEditor({
   );
 }
 
-function updateLeader(
-  content: AboutPageContent,
-  index: number,
-  partial: Partial<AboutPageContent["leaders"][number]>,
-  patch: (partial: Partial<AboutPageContent>) => void,
-) {
-  const leaders = content.leaders.slice();
-  const current = leaders[index];
-  if (!current) return;
-  leaders[index] = { ...current, ...partial };
-  patch({ leaders });
+function replaceLeader(leaders: AboutLeader[], leader: AboutLeader): AboutLeader[] {
+  return leaders.map((item) => (item.id === leader.id ? leader : item));
+}
+
+function LeaderRecords({
+  leaders,
+  tableReady,
+  pending,
+  startTransition,
+  onLeaders,
+  onError,
+  onMessage,
+}: {
+  leaders: AboutLeader[];
+  tableReady: boolean;
+  pending: boolean;
+  startTransition: TransitionStartFunction;
+  onLeaders: (leaders: AboutLeader[]) => void;
+  onError: (message: string | null) => void;
+  onMessage: (message: string | null) => void;
+}) {
+  const [form, setForm] = useState<
+    { mode: "create"; leader: AboutLeader } | { mode: "edit"; id: string } | null
+  >(null);
+  const editing = form?.mode === "edit" ? leaders.find((leader) => leader.id === form.id) : null;
+  const active = form?.mode === "create" ? form.leader : editing;
+
+  function updateActive(partial: Partial<AboutLeader>) {
+    if (!form || !active) return;
+    const next = { ...active, ...partial };
+    if (form.mode === "create") {
+      setForm({ mode: "create", leader: next });
+      return;
+    }
+    onLeaders(replaceLeader(leaders, next));
+  }
+
+  function closeForm() {
+    if (form?.mode === "create") {
+      const draft = form.leader;
+      const untouched =
+        draft.name === "" &&
+        draft.position === "" &&
+        draft.bio === "" &&
+        draft.initials === "" &&
+        draft.linkedInUrl === "" &&
+        draft.contactUrl === "" &&
+        draft.photoUrl === "";
+      if (!untouched) {
+        const parsed = parseAboutLeader(draft);
+        if (!parsed.ok) {
+          onError(parsed.error);
+          return;
+        }
+        onLeaders([...leaders, parsed.leader]);
+      }
+    }
+    onError(null);
+    setForm(null);
+  }
+
+  function publishLeader(leader: AboutLeader) {
+    const next = { ...leader, published: true };
+    const parsed = parseAboutLeader(next);
+    if (!parsed.ok) {
+      onError(parsed.error);
+      return;
+    }
+    onError(null);
+    onMessage(null);
+    startTransition(async () => {
+      const result = await setAboutLeaderPublishedAction(parsed.leader);
+      if (!result.ok) {
+        onError(result.message);
+        return;
+      }
+      onLeaders(replaceLeader(leaders, parsed.leader));
+      onMessage(`${parsed.leader.name} is on the About Us page.`);
+    });
+  }
+
+  function deleteLeader(leader: AboutLeader) {
+    onError(null);
+    onMessage(null);
+    startTransition(async () => {
+      const result = await deleteAboutLeaderAction(leader.id);
+      if (!result.ok) {
+        onError(result.message);
+        return;
+      }
+      onLeaders(leaders.filter((item) => item.id !== leader.id));
+      onMessage(`${leader.name} was removed.`);
+    });
+  }
+
+  async function uploadPhoto(file: File) {
+    const formData = new FormData();
+    formData.set("file", file);
+    const result = await uploadAboutLeaderPhotoAction(formData);
+    if (!result.ok) {
+      onError(result.message);
+      return;
+    }
+    if (!active) return;
+    const next = { ...active, photoUrl: result.url };
+    if (form?.mode === "create") {
+      setForm({ mode: "create", leader: next });
+    } else {
+      onLeaders(replaceLeader(leaders, next));
+    }
+    if (next.published) {
+      const saved = await setAboutLeaderPublishedAction(next);
+      if (!saved.ok) {
+        onError(saved.message);
+        return;
+      }
+      onMessage("Photograph updated on the About Us page.");
+      return;
+    }
+    onMessage("Photograph uploaded. Publish this leader to show it on the About Us page.");
+  }
+
+  if (active && form) {
+    return (
+      <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+        <Button type="button" size="sm" variant="outline" onClick={closeForm}>
+          Back
+        </Button>
+        <Field label="Name" value={active.name} onChange={(name) => updateActive({ name })} />
+        <Field label="Position" value={active.position} onChange={(position) => updateActive({ position })} />
+        <Field label="Initials" value={active.initials} onChange={(initials) => updateActive({ initials })} />
+        <Field label="Biography" value={active.bio} multiline onChange={(bio) => updateActive({ bio })} />
+        <Field label="LinkedIn URL" value={active.linkedInUrl} onChange={(linkedInUrl) => updateActive({ linkedInUrl })} />
+        <Field label="Contact URL" value={active.contactUrl} onChange={(contactUrl) => updateActive({ contactUrl })} />
+        <p className="text-xs text-muted-foreground">
+          {active.photoUrl ? "Photograph uploaded." : "No photograph. Initials are shown."}
+        </p>
+        <Input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={pending || !tableReady}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (!file) return;
+            onError(null);
+            startTransition(() => uploadPhoto(file));
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <Button
+          type="button"
+          disabled={pending || leaders.length >= 12}
+          onClick={() => {
+            onError(null);
+            onMessage(null);
+            setForm({ mode: "create", leader: blankAboutLeader() });
+          }}
+        >
+          New record
+        </Button>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Position</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {leaders.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={3} className="text-muted-foreground">
+                No leadership records yet.
+              </TableCell>
+            </TableRow>
+          ) : (
+            leaders.map((leader) => (
+              <TableRow key={leader.id}>
+                <TableCell>{leader.name}</TableCell>
+                <TableCell>{leader.position}</TableCell>
+                <TableCell className="whitespace-normal">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={pending}
+                      onClick={() => {
+                        onError(null);
+                        setForm({ mode: "edit", id: leader.id });
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={pending || !tableReady}
+                      onClick={() => deleteLeader(leader)}
+                    >
+                      Delete
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={leader.published ? "secondary" : "default"}
+                      disabled={pending || !tableReady}
+                      onClick={() => publishLeader(leader)}
+                    >
+                      {leader.published ? "Published" : "Publish"}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
 }
 
 function ParagraphList({

@@ -511,7 +511,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "The footer on every page links to About Us, and the guest header includes About.",
           "Signed-in users can also open About Flipvise from the Help Center.",
           "Explore Flipvise opens Documentation, View Plans opens Pricing, and Contact Us opens the contact form.",
-          "Leadership cards show initials until a platform administrator uploads a photograph.",
+          "Leadership cards list only people a platform administrator has published. Initials show until a photograph is uploaded.",
           "Version numbers are read from the web package, the Android project, and the iOS project. Web, Android, and iOS can differ.",
           "What's New stays empty until a platform administrator publishes a release note.",
           "Get Started returns to the homepage for guests and to the dashboard for signed-in users.",
